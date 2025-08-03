@@ -2,39 +2,69 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+/* Project Chronos Design System - AI-Powered Scheduling Assistant
+Modern, professional design with AI-inspired gradients and colors
 All colors MUST be HSL.
 */
 
 @layer base {
   :root {
+    /* Core palette - Deep purple/blue AI-inspired theme */
     --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --foreground: 225 15% 15%;
 
+    /* Card system */
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 225 15% 15%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 225 15% 15%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    /* Primary - Deep AI purple */
+    --primary: 250 50% 25%;
+    --primary-foreground: 0 0% 98%;
+    --primary-glow: 250 60% 35%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    /* Secondary - Soft blue-gray */
+    --secondary: 220 15% 96%;
+    --secondary-foreground: 225 15% 25%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    /* Muted system */
+    --muted: 220 15% 96%;
+    --muted-foreground: 220 10% 50%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    /* Accent - Bright AI blue */
+    --accent: 220 80% 60%;
+    --accent-foreground: 0 0% 98%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    /* Status colors */
+    --success: 120 60% 50%;
+    --success-foreground: 0 0% 98%;
+    
+    --warning: 35 90% 55%;
+    --warning-foreground: 0 0% 98%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+
+    /* Interface elements */
+    --border: 220 15% 90%;
+    --input: 220 15% 95%;
+    --ring: 250 50% 25%;
+
+    /* AI-inspired gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(250 50% 25%), hsl(220 80% 60%));
+    --gradient-card: linear-gradient(135deg, hsl(0 0% 100%), hsl(220 15% 98%));
+    --gradient-accent: linear-gradient(135deg, hsl(220 80% 60%), hsl(250 60% 35%));
+    
+    /* Shadows with purple glow */
+    --shadow-elegant: 0 10px 30px -10px hsl(250 50% 25% / 0.2);
+    --shadow-glow: 0 0 40px hsl(250 60% 35% / 0.3);
+    --shadow-card: 0 4px 20px -4px hsl(220 15% 25% / 0.1);
+
+    /* Animations */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-bounce: all 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 
     --radius: 0.5rem;
 
@@ -56,41 +86,67 @@ All colors MUST be HSL.
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    /* Dark mode - Deep space theme with purple accents */
+    --background: 225 25% 8%;
+    --foreground: 220 15% 95%;
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    --card: 225 25% 10%;
+    --card-foreground: 220 15% 95%;
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 225 25% 10%;
+    --popover-foreground: 220 15% 95%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    /* Primary - Bright AI purple for dark mode */
+    --primary: 250 70% 65%;
+    --primary-foreground: 225 25% 8%;
+    --primary-glow: 250 80% 75%;
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    /* Secondary - Dark blue-gray */
+    --secondary: 225 25% 15%;
+    --secondary-foreground: 220 15% 85%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    /* Muted system */
+    --muted: 225 25% 15%;
+    --muted-foreground: 220 10% 60%;
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    /* Accent - Bright blue for dark mode */
+    --accent: 220 90% 65%;
+    --accent-foreground: 225 25% 8%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    /* Status colors for dark mode */
+    --success: 120 60% 55%;
+    --success-foreground: 0 0% 98%;
+    
+    --warning: 35 90% 60%;
+    --warning-foreground: 0 0% 98%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --destructive: 0 84% 65%;
+    --destructive-foreground: 0 0% 98%;
+
+    /* Interface elements */
+    --border: 225 25% 20%;
+    --input: 225 25% 15%;
+    --ring: 250 70% 65%;
+
+    /* Dark mode gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(250 70% 65%), hsl(220 90% 65%));
+    --gradient-card: linear-gradient(135deg, hsl(225 25% 10%), hsl(225 25% 12%));
+    --gradient-accent: linear-gradient(135deg, hsl(220 90% 65%), hsl(250 80% 75%));
+    
+    /* Dark shadows with glow */
+    --shadow-elegant: 0 10px 30px -10px hsl(250 70% 65% / 0.3);
+    --shadow-glow: 0 0 40px hsl(250 80% 75% / 0.4);
+    --shadow-card: 0 4px 20px -4px hsl(220 15% 5% / 0.5);
+
+    /* Sidebar for dark mode */
+    --sidebar-background: 225 25% 8%;
+    --sidebar-foreground: 220 15% 85%;
+    --sidebar-primary: 250 70% 65%;
+    --sidebar-primary-foreground: 225 25% 8%;
+    --sidebar-accent: 225 25% 15%;
+    --sidebar-accent-foreground: 220 15% 85%;
+    --sidebar-border: 225 25% 20%;
+    --sidebar-ring: 250 70% 65%;
   }
 }
 
