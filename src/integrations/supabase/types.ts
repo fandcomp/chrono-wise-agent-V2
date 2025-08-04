@@ -14,6 +14,54 @@ export type Database = {
   }
   public: {
     Tables: {
+      profiles: {
+        Row: {
+          ai_learning_enabled: boolean | null
+          avatar_url: string | null
+          break_duration: number | null
+          created_at: string
+          full_name: string | null
+          id: string
+          notification_preferences: Json | null
+          preferred_break_times: string[] | null
+          timezone: string | null
+          updated_at: string
+          user_id: string
+          work_end_time: string | null
+          work_start_time: string | null
+        }
+        Insert: {
+          ai_learning_enabled?: boolean | null
+          avatar_url?: string | null
+          break_duration?: number | null
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          notification_preferences?: Json | null
+          preferred_break_times?: string[] | null
+          timezone?: string | null
+          updated_at?: string
+          user_id: string
+          work_end_time?: string | null
+          work_start_time?: string | null
+        }
+        Update: {
+          ai_learning_enabled?: boolean | null
+          avatar_url?: string | null
+          break_duration?: number | null
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          notification_preferences?: Json | null
+          preferred_break_times?: string[] | null
+          timezone?: string | null
+          updated_at?: string
+          user_id?: string
+          work_end_time?: string | null
+          work_start_time?: string | null
+        }
+        Relationships: []
+      }
       tasks: {
         Row: {
           created_at: string
