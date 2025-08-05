@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import type { Database } from '@/integrations/supabase/types';
+const STORAGE_KEY = 'task_management_data';
 
 type DbTask = Database['public']['Tables']['tasks']['Row'];
 type InsertTask = Database['public']['Tables']['tasks']['Insert'];
@@ -26,6 +27,20 @@ export interface CreateTaskData {
   start_time: string;
   end_time: string;
   category: string;
+}
+
+export function getTasksForUser(userId: string): Task[] {
+  // Ambil tasks dari localStorage (atau sumber lain sesuai kebutuhan Anda)
+  const savedTasks = localStorage.getItem(STORAGE_KEY);
+  if (!savedTasks) return [];
+  try {
+    const tasks: Task[] = JSON.parse(savedTasks);
+    // Filter berdasarkan userId jika Task ada field userId
+    return tasks.filter(task => task.user_id === userId);
+  } catch (e) {
+    console.error('Failed to parse tasks from storage', e);
+    return [];
+  }
 }
 
 export const useTasks = () => {

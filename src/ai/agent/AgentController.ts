@@ -1,5 +1,5 @@
 import { geminiPrompt } from "@/ai/gemini/client";
-import { CalendarAPI } from "@/integrations/calendar";
+import { GoogleCalendarAPI } from "@/integrations/calendar/googleCalendar";
 import { getTasksForUser } from "@/hooks/useTasks";
 
 export class AgentController {
@@ -12,7 +12,7 @@ export class AgentController {
     // 1. Ambil semua task user yang belum dijadwalkan
     const tasks = await getTasksForUser(this.userId);
     // 2. Ambil jadwal kalender user
-    const calendarEvents = await CalendarAPI.getEvents(this.userId);
+    const calendarEvents = await GoogleCalendarAPI.listEvents();
 
     // 3. Minta LLM untuk membuat rencana penjadwalan otomatis
     const prompt = `
@@ -27,7 +27,7 @@ Buatkan penjadwalan optimal, pastikan tidak bentrok. Balas sebagai array JSON, s
     // 4. Eksekusi rencana: buat event di calendar
     for (const step of plan) {
       try {
-        await CalendarAPI.createEvent(this.userId, step);
+        await GoogleCalendarAPI.createEvent(step);
       } catch (e) {
         // Jika gagal, lakukan perbaikan otomatis (misal: cari waktu lain, update plan, dst)
         await this.handleFailure(step, e);
@@ -43,7 +43,7 @@ Cari solusi alternatif, balas dalam format seperti sebelumnya.
     `;
     const newStepRaw = await geminiPrompt(prompt);
     const newStep = extractJsonOnly(newStepRaw)[0];
-    await CalendarAPI.createEvent(this.userId, newStep);
+    await GoogleCalendarAPI.createEvent(newStep);
   }
 }
 

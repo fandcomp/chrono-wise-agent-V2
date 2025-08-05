@@ -7,7 +7,6 @@ export interface GoogleCalendarCredentials {
   refresh_token: string;
 }
 
-// Simpan credentials di env atau db, contoh hardcode untuk demo
 const credentials: GoogleCalendarCredentials = {
   client_id: process.env.GCAL_CLIENT_ID!,
   client_secret: process.env.GCAL_CLIENT_SECRET!,
