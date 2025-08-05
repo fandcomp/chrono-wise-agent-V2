@@ -64,32 +64,35 @@ export type Database = {
       }
       tasks: {
         Row: {
+          category: string
           created_at: string
           description: string | null
-          end_time: string | null
-          google_calendar_event_id: string | null
-          id: number
-          start_time: string | null
+          end_time: string
+          id: string
+          is_completed: boolean
+          start_time: string
           title: string
           user_id: string
         }
         Insert: {
+          category?: string
           created_at?: string
           description?: string | null
-          end_time?: string | null
-          google_calendar_event_id?: string | null
-          id?: never
-          start_time?: string | null
+          end_time: string
+          id?: string
+          is_completed?: boolean
+          start_time: string
           title: string
           user_id: string
         }
         Update: {
+          category?: string
           created_at?: string
           description?: string | null
-          end_time?: string | null
-          google_calendar_event_id?: string | null
-          id?: never
-          start_time?: string | null
+          end_time?: string
+          id?: string
+          is_completed?: boolean
+          start_time?: string
           title?: string
           user_id?: string
         }
@@ -124,6 +127,20 @@ export type Database = {
       check_conflict: {
         Args: { p_user_id: string; p_start_time: string; p_end_time: string }
         Returns: boolean
+      }
+      get_tasks_by_category: {
+        Args: { p_user_id: string }
+        Returns: {
+          category: string
+          count: number
+        }[]
+      }
+      get_tasks_completion_stats: {
+        Args: { p_user_id: string }
+        Returns: {
+          status: string
+          count: number
+        }[]
       }
     }
     Enums: {

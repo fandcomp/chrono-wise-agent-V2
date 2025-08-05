@@ -2,11 +2,16 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
+import type { Database } from '@/integrations/supabase/types';
+
+type DbTask = Database['public']['Tables']['tasks']['Row'];
+type InsertTask = Database['public']['Tables']['tasks']['Insert'];
+type UpdateTask = Database['public']['Tables']['tasks']['Update'];
 
 export interface Task {
   id: string;
   title: string;
-  description?: string;
+  description?: string | null;
   start_time: string;
   end_time: string;
   category: string;
@@ -40,7 +45,21 @@ export const useTasks = () => {
         .order('start_time', { ascending: true });
 
       if (error) throw error;
-      setTasks(data || []);
+      
+      // Transform the database response to our Task interface
+      const transformedTasks: Task[] = (data || []).map(task => ({
+        id: task.id,
+        title: task.title,
+        description: task.description,
+        start_time: task.start_time,
+        end_time: task.end_time,
+        category: task.category,
+        is_completed: task.is_completed,
+        created_at: task.created_at,
+        user_id: task.user_id
+      }));
+      
+      setTasks(transformedTasks);
     } catch (error) {
       console.error('Error fetching tasks:', error);
       toast({
@@ -68,13 +87,26 @@ export const useTasks = () => {
 
       if (error) throw error;
 
-      setTasks(prev => [...prev, data]);
+      // Transform the response to match our Task interface
+      const newTask: Task = {
+        id: data.id,
+        title: data.title,
+        description: data.description,
+        start_time: data.start_time,
+        end_time: data.end_time,
+        category: data.category,
+        is_completed: data.is_completed,
+        created_at: data.created_at,
+        user_id: data.user_id
+      };
+
+      setTasks(prev => [...prev, newTask]);
       toast({
         title: "Task created",
         description: "Your task has been added successfully."
       });
 
-      return data;
+      return newTask;
     } catch (error) {
       console.error('Error creating task:', error);
       toast({
@@ -88,17 +120,40 @@ export const useTasks = () => {
 
   const updateTask = async (id: string, updates: Partial<Task>) => {
     try {
+      // Convert Task updates to database format
+      const dbUpdates: Partial<UpdateTask> = {
+        title: updates.title,
+        description: updates.description,
+        start_time: updates.start_time,
+        end_time: updates.end_time,
+        category: updates.category,
+        is_completed: updates.is_completed
+      };
+
       const { data, error } = await supabase
         .from('tasks')
-        .update(updates)
+        .update(dbUpdates)
         .eq('id', id)
         .select()
         .single();
 
       if (error) throw error;
 
+      // Transform the response to match our Task interface
+      const updatedTask: Task = {
+        id: data.id,
+        title: data.title,
+        description: data.description,
+        start_time: data.start_time,
+        end_time: data.end_time,
+        category: data.category,
+        is_completed: data.is_completed,
+        created_at: data.created_at,
+        user_id: data.user_id
+      };
+
       setTasks(prev => 
-        prev.map(task => task.id === id ? data : task)
+        prev.map(task => task.id === id ? updatedTask : task)
       );
 
       toast({
@@ -106,7 +161,7 @@ export const useTasks = () => {
         description: "Your task has been updated successfully."
       });
 
-      return data;
+      return updatedTask;
     } catch (error) {
       console.error('Error updating task:', error);
       toast({
@@ -167,11 +222,35 @@ export const useTasks = () => {
         },
         (payload) => {
           if (payload.eventType === 'INSERT') {
-            setTasks(prev => [...prev, payload.new as Task]);
+            const newTask = payload.new as DbTask;
+            const transformedTask: Task = {
+              id: newTask.id,
+              title: newTask.title,
+              description: newTask.description,
+              start_time: newTask.start_time,
+              end_time: newTask.end_time,
+              category: newTask.category,
+              is_completed: newTask.is_completed,
+              created_at: newTask.created_at,
+              user_id: newTask.user_id
+            };
+            setTasks(prev => [...prev, transformedTask]);
           } else if (payload.eventType === 'UPDATE') {
+            const updatedTask = payload.new as DbTask;
+            const transformedTask: Task = {
+              id: updatedTask.id,
+              title: updatedTask.title,
+              description: updatedTask.description,
+              start_time: updatedTask.start_time,
+              end_time: updatedTask.end_time,
+              category: updatedTask.category,
+              is_completed: updatedTask.is_completed,
+              created_at: updatedTask.created_at,
+              user_id: updatedTask.user_id
+            };
             setTasks(prev => 
               prev.map(task => 
-                task.id === payload.new.id ? payload.new as Task : task
+                task.id === transformedTask.id ? transformedTask : task
               )
             );
           } else if (payload.eventType === 'DELETE') {
