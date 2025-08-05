@@ -18,6 +18,14 @@ import {
   User
 } from "lucide-react";
 
+function cleanGeminiJson(str: string): string {
+  let res = str.trim();
+  if (res.startsWith("```json")) res = res.replace(/^```json/, "").trim();
+  if (res.startsWith("```")) res = res.replace(/^```/, "").trim();
+  if (res.endsWith("```")) res = res.replace(/```$/, "").trim();
+  return res;
+}
+
 interface ExtractedEvent {
   id: string;
   title: string;
@@ -84,45 +92,56 @@ export const UploadView = () => {
   };
 
   const processPDF = async (file: File) => {
-    try {
-      const extractedText = await extractTextFromPDF(file);
+  // Fungsi pembersih blok kode markdown
+  function cleanGeminiJson(str: string): string {
+    let res = str.trim();
+    if (res.startsWith("```json")) res = res.replace(/^```json/, "").trim();
+    if (res.startsWith("```")) res = res.replace(/^```/, "").trim();
+    if (res.endsWith("```")) res = res.replace(/```$/, "").trim();
+    return res;
+  }
 
-      // Prompt Gemini untuk field yang lengkap dan confidence
-      const prompt = `
+  try {
+    const extractedText = await extractTextFromPDF(file);
+
+    // Prompt Gemini untuk field yang lengkap dan confidence
+    const prompt = `
 Extract all events from the following academic schedule text. 
 Reply as a JSON array. Each event: 
 {id: string, title: string, date: string (YYYY-MM-DD), startTime: string (HH:mm), endTime: string (HH:mm), location?: string, instructor?: string, category: string, confidence: number (0-1, how sure the AI is about this event)}. 
 TEXT: """${extractedText}"""
 `;
 
-      const aiResult = await geminiPrompt(prompt);
+    const aiResult = await geminiPrompt(prompt);
 
-      let parsed: ExtractedEvent[];
-      try {
-        parsed = JSON.parse(aiResult);
-        // Jika AI tidak memberikan id, generate id sendiri
-        parsed = parsed.map((ev, idx) => ({
-          ...ev,
-          id: ev.id || (idx + 1).toString(),
-        }));
-        setExtractedEvents(parsed);
-        setUploadState("completed");
-        toast({
-          title: "Schedule extracted successfully!",
-          description: `Found ${parsed.length} events in your PDF`,
-        });
-      } catch {
-        throw new Error("AI response format error: " + aiResult);
-      }
-    } catch (e: any) {
-      setUploadState("idle");
+    let parsed: ExtractedEvent[];
+    try {
+      // Bersihkan blok kode sebelum parse JSON
+      const aiResultClean = cleanGeminiJson(aiResult);
+      parsed = JSON.parse(aiResultClean);
+      // Jika AI tidak memberikan id, generate id sendiri
+      parsed = parsed.map((ev, idx) => ({
+        ...ev,
+        id: ev.id || (idx + 1).toString(),
+      }));
+      setExtractedEvents(parsed);
+      setUploadState("completed");
       toast({
-        title: "Failed to extract schedule",
-        description: e.message,
-        variant: "destructive",
+        title: "Schedule extracted successfully!",
+        description: `Found ${parsed.length} events in your PDF`,
       });
+    } catch {
+      throw new Error("AI response format error: " + aiResult);
     }
-  };
+  } catch (e: any) {
+    setUploadState("idle");
+    toast({
+      title: "Failed to extract schedule",
+      description: e.message,
+      variant: "destructive",
+    });
+  }
+};
 
   const getConfidenceColor = (confidence: number) => {
     if (confidence >= 0.9) return 'bg-success text-success-foreground';

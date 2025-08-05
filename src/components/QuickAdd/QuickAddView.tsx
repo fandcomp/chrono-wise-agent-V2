@@ -40,6 +40,21 @@ const nlpExamples = [
   "Lunch dengan tim marketing tomorrow 12:30"
 ];
 
+function extractJsonOnly(str: string): string {
+  // Hilangkan blok markdown
+  let res = str.trim();
+  if (res.startsWith("```json")) res = res.replace(/^```json/, "").trim();
+  if (res.startsWith("```")) res = res.replace(/^```/, "").trim();
+  if (res.endsWith("```")) res = res.replace(/```$/, "").trim();
+  // Ambil hanya bagian JSON (kurung kurawal awal hingga akhir)
+  const firstCurly = res.indexOf("{");
+  const lastCurly = res.lastIndexOf("}");
+  if (firstCurly !== -1 && lastCurly !== -1 && firstCurly < lastCurly) {
+    return res.substring(firstCurly, lastCurly + 1);
+  }
+  return res;
+}
+
 export const QuickAddView = () => {
   const [naturalInput, setNaturalInput] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -72,11 +87,12 @@ export const QuickAddView = () => {
       const aiResult = await geminiPrompt(prompt);
 
       let parsed;
-      try {
-        parsed = JSON.parse(aiResult);
-      } catch {
-        throw new Error("AI response format error: " + aiResult);
-      }
+try {
+  const aiResultClean = extractJsonOnly(aiResult);
+  parsed = JSON.parse(aiResultClean);
+} catch {
+  throw new Error("AI response format error: " + aiResult);
+}
 
       setParsedEvent(parsed);
       toast({
