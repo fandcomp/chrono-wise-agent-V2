@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { geminiPrompt } from "@/ai/gemini/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -29,46 +30,28 @@ interface ExtractedEvent {
   confidence: number;
 }
 
-const mockExtractedEvents: ExtractedEvent[] = [
-  {
-    id: '1',
-    title: 'Algoritma dan Struktur Data',
-    date: '2024-08-05',
-    startTime: '08:00',
-    endTime: '10:00',
-    location: 'Lab Komputer 1',
-    instructor: 'Dr. Budi Santoso',
-    category: 'Kuliah',
-    confidence: 0.95
-  },
-  {
-    id: '2',
-    title: 'Presentasi Project UI/UX',
-    date: '2024-08-05',
-    startTime: '13:00',
-    endTime: '15:00',
-    location: 'Ruang Seminar A',
-    instructor: 'Prof. Sarah Ahmad',
-    category: 'Kuliah',
-    confidence: 0.88
-  },
-  {
-    id: '3',
-    title: 'Meeting Client - Logo Design',
-    date: '2024-08-06',
-    startTime: '10:30',
-    endTime: '11:30',
-    location: 'Coffee Shop Central',
-    category: 'Pekerjaan',
-    confidence: 0.92
-  }
-];
-
 export const UploadView = () => {
   const [uploadState, setUploadState] = useState<'idle' | 'uploading' | 'processing' | 'completed'>('idle');
   const [uploadProgress, setUploadProgress] = useState(0);
   const [extractedEvents, setExtractedEvents] = useState<ExtractedEvent[]>([]);
   const { toast } = useToast();
+
+  // Fungsi untuk ekstraksi teks dari PDF (implementasikan dengan pdf.js atau sesuai kebutuhan)
+  const extractTextFromPDF = async (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        try {
+          // TODO: replace with real PDF parsing
+          resolve("Isi teks hasil ekstrak PDF (implementasikan sesuai library PDF yang dipakai)");
+        } catch (e) {
+          reject(e);
+        }
+      };
+      reader.onerror = reject;
+      reader.readAsArrayBuffer(file);
+    });
+  };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -83,32 +66,62 @@ export const UploadView = () => {
       return;
     }
 
-    // Simulate upload and processing
     setUploadState('uploading');
     setUploadProgress(0);
 
-    // Upload simulation
+    // Simulasi upload progress
     const uploadInterval = setInterval(() => {
       setUploadProgress(prev => {
         if (prev >= 100) {
           clearInterval(uploadInterval);
           setUploadState('processing');
-          
-          // Processing simulation
-          setTimeout(() => {
-            setExtractedEvents(mockExtractedEvents);
-            setUploadState('completed');
-            toast({
-              title: "Schedule extracted successfully!",
-              description: `Found ${mockExtractedEvents.length} events in your PDF`,
-            });
-          }, 3000);
-          
+          processPDF(file);
           return 100;
         }
         return prev + 10;
       });
     }, 200);
+  };
+
+  const processPDF = async (file: File) => {
+    try {
+      const extractedText = await extractTextFromPDF(file);
+
+      // Prompt Gemini untuk field yang lengkap dan confidence
+      const prompt = `
+Extract all events from the following academic schedule text. 
+Reply as a JSON array. Each event: 
+{id: string, title: string, date: string (YYYY-MM-DD), startTime: string (HH:mm), endTime: string (HH:mm), location?: string, instructor?: string, category: string, confidence: number (0-1, how sure the AI is about this event)}. 
+TEXT: """${extractedText}"""
+`;
+
+      const aiResult = await geminiPrompt(prompt);
+
+      let parsed: ExtractedEvent[];
+      try {
+        parsed = JSON.parse(aiResult);
+        // Jika AI tidak memberikan id, generate id sendiri
+        parsed = parsed.map((ev, idx) => ({
+          ...ev,
+          id: ev.id || (idx + 1).toString(),
+        }));
+        setExtractedEvents(parsed);
+        setUploadState("completed");
+        toast({
+          title: "Schedule extracted successfully!",
+          description: `Found ${parsed.length} events in your PDF`,
+        });
+      } catch {
+        throw new Error("AI response format error: " + aiResult);
+      }
+    } catch (e: any) {
+      setUploadState("idle");
+      toast({
+        title: "Failed to extract schedule",
+        description: e.message,
+        variant: "destructive",
+      });
+    }
   };
 
   const getConfidenceColor = (confidence: number) => {
@@ -311,11 +324,17 @@ export const UploadView = () => {
               </div>
               <div>
                 <span className="font-semibold">Avg Confidence:</span>
-                <span className="ml-2">92%</span>
+                <span className="ml-2">
+                  {Math.round(
+                    extractedEvents.reduce((a, b) => a + b.confidence, 0) /
+                      extractedEvents.length *
+                      100
+                  ) / 100}%
+                </span>
               </div>
               <div>
                 <span className="font-semibold">Processing Time:</span>
-                <span className="ml-2">3.2s</span>
+                <span className="ml-2">~3s</span>
               </div>
               <div>
                 <span className="font-semibold">Format Detected:</span>

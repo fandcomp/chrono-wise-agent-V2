@@ -1,9 +1,11 @@
+import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { useTasks } from "@/hooks/useTasks";
 import { useAuth } from "@/contexts/AuthContext";
+import { geminiPrompt } from "@/ai/gemini/client";
 import { 
   Calendar, 
   Clock, 
@@ -12,7 +14,8 @@ import {
   CheckCircle2, 
   AlertCircle,
   Plus,
-  MoreHorizontal
+  MoreHorizontal,
+  Brain
 } from "lucide-react";
 
 interface DashboardEvent {
@@ -60,7 +63,7 @@ export const DashboardView = () => {
   const { tasks, loading, toggleComplete } = useTasks();
   const { user } = useAuth();
   const currentTime = new Date();
-  
+
   // Transform tasks into dashboard events
   const todayEvents: DashboardEvent[] = tasks
     .filter(task => {
@@ -72,14 +75,14 @@ export const DashboardView = () => {
       const startTime = new Date(task.start_time);
       const endTime = new Date(task.end_time);
       const duration = Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60));
-      
+
       let status: 'upcoming' | 'current' | 'completed' = 'upcoming';
       if (task.is_completed) {
         status = 'completed';
       } else if (currentTime >= startTime && currentTime <= endTime) {
         status = 'current';
       }
-      
+
       return {
         id: task.id,
         title: task.title,
@@ -96,6 +99,30 @@ export const DashboardView = () => {
   const completedTasks = tasks.filter(task => task.is_completed).length;
   const totalTasks = tasks.length;
   const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+  // === Gemini AI Suggestions integration ===
+  const [aiSuggestions, setAiSuggestions] = useState<string>("");
+  const [aiLoading, setAiLoading] = useState(false);
+
+  useEffect(() => {
+    const fetchSuggestions = async () => {
+      setAiLoading(true);
+      try {
+        // You can adjust this prompt for more relevant suggestions
+        const prompt = `Berikut adalah daftar task harian saya: ${JSON.stringify(todayEvents)}. 
+Berdasarkan data ini, berikan 3 saran produktivitas yang actionable dan personal. 
+Jawab dalam format bullet point singkat dan dalam bahasa Indonesia.`;
+        const result = await geminiPrompt(prompt);
+        setAiSuggestions(result);
+      } catch (e: any) {
+        setAiSuggestions("Gagal memuat saran AI.");
+      }
+      setAiLoading(false);
+    };
+
+    if (todayEvents.length > 0) fetchSuggestions();
+    else setAiSuggestions("");
+  }, [JSON.stringify(todayEvents)]);
 
   return (
     <div className="space-y-6">
@@ -273,15 +300,22 @@ export const DashboardView = () => {
             </div>
             
             <div className="space-y-3 text-sm">
-              <div className="bg-accent-foreground/10 rounded-lg p-3">
-                <p className="font-medium">Schedule a 15-min break</p>
-                <p className="text-accent-foreground/80">After your 2-hour work block</p>
-              </div>
-              
-              <div className="bg-accent-foreground/10 rounded-lg p-3">
-                <p className="font-medium">Move gym session earlier</p>
-                <p className="text-accent-foreground/80">Avoid evening traffic</p>
-              </div>
+              {aiLoading ? (
+                <div className="flex items-center gap-2">
+                  <Brain className="h-4 w-4 animate-spin" />
+                  <span>Loading AI suggestions...</span>
+                </div>
+              ) : aiSuggestions ? (
+                <div
+                  dangerouslySetInnerHTML={{
+                    __html: aiSuggestions.replace(/\n/g, "<br/>"),
+                  }}
+                />
+              ) : (
+                <div className="text-muted-foreground">
+                  Tambahkan beberapa task hari ini untuk mendapatkan saran AI!
+                </div>
+              )}
             </div>
           </Card>
 

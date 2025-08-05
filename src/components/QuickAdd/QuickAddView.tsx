@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { geminiPrompt } from "@/ai/gemini/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -64,28 +65,32 @@ export const QuickAddView = () => {
     if (!naturalInput.trim()) return;
 
     setIsProcessing(true);
-    
-    // Simulate AI processing
-    setTimeout(() => {
-      const mockParsed: ParsedEvent = {
-        title: "Meeting dengan Klien B",
-        date: "2024-08-06",
-        startTime: "14:00",
-        endTime: "15:00",
-        location: "Starbucks Central Park",
-        category: "Pekerjaan",
-        priority: "high",
-        confidence: 0.87
-      };
-      
-      setParsedEvent(mockParsed);
-      setIsProcessing(false);
-      
+    try {
+      // Prompt Gemini
+      const prompt = `Extract meeting/event details from: "${naturalInput}". Reply with JSON including fields: title, date (YYYY-MM-DD), startTime (HH:mm), endTime (optional, HH:mm), location, category, priority (high/medium/low).`;
+
+      const aiResult = await geminiPrompt(prompt);
+
+      let parsed;
+      try {
+        parsed = JSON.parse(aiResult);
+      } catch {
+        throw new Error("AI response format error: " + aiResult);
+      }
+
+      setParsedEvent(parsed);
       toast({
         title: "Event parsed successfully!",
         description: "AI has extracted the event details from your input",
       });
-    }, 2000);
+    } catch (e: any) {
+      toast({
+        title: "AI Error",
+        description: e.message,
+        variant: "destructive"
+      });
+    }
+    setIsProcessing(false);
   };
 
   const handleSaveEvent = async () => {
