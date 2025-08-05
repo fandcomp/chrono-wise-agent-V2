@@ -2,6 +2,8 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { useTasks } from "@/hooks/useTasks";
+import { useAuth } from "@/contexts/AuthContext";
 import { 
   Calendar, 
   Clock, 
@@ -13,68 +15,18 @@ import {
   MoreHorizontal
 } from "lucide-react";
 
-interface Event {
+interface DashboardEvent {
   id: string;
   title: string;
   time: string;
   duration: string;
-  category: 'work' | 'personal' | 'study' | 'break';
-  priority: 'high' | 'medium' | 'low';
+  category: string;
   location?: string;
   status: 'upcoming' | 'current' | 'completed';
+  is_completed: boolean;
 }
 
-const todayEvents: Event[] = [
-  {
-    id: '1',
-    title: 'Morning Standup Meeting',
-    time: '09:00',
-    duration: '30m',
-    category: 'work',
-    priority: 'high',
-    location: 'Conference Room A',
-    status: 'completed'
-  },
-  {
-    id: '2', 
-    title: 'UI Design Review',
-    time: '10:30',
-    duration: '1h',
-    category: 'work',
-    priority: 'high',
-    status: 'current'
-  },
-  {
-    id: '3',
-    title: 'Lunch Break',
-    time: '12:00',
-    duration: '45m',
-    category: 'break',
-    priority: 'low',
-    status: 'upcoming'
-  },
-  {
-    id: '4',
-    title: 'Client Presentation Prep',
-    time: '14:00',
-    duration: '2h',
-    category: 'work',
-    priority: 'high',
-    status: 'upcoming'
-  },
-  {
-    id: '5',
-    title: 'Gym Session',
-    time: '17:00',
-    duration: '1h',
-    category: 'personal',
-    priority: 'medium',
-    location: 'Fitness Center',
-    status: 'upcoming'
-  }
-];
-
-const getEventStatusIcon = (status: Event['status']) => {
+const getEventStatusIcon = (status: DashboardEvent['status']) => {
   switch (status) {
     case 'completed':
       return <CheckCircle2 className="h-4 w-4 text-success" />;
@@ -85,8 +37,8 @@ const getEventStatusIcon = (status: Event['status']) => {
   }
 };
 
-const getCategoryColor = (category: Event['category']) => {
-  switch (category) {
+const getCategoryColor = (category: string) => {
+  switch (category.toLowerCase()) {
     case 'work':
       return 'bg-primary text-primary-foreground';
     case 'study':
@@ -95,33 +47,66 @@ const getCategoryColor = (category: Event['category']) => {
       return 'bg-success text-success-foreground';
     case 'break':
       return 'bg-muted text-muted-foreground';
+    default:
+      return 'bg-secondary text-secondary-foreground';
   }
 };
 
-const getPriorityColor = (priority: Event['priority']) => {
-  switch (priority) {
-    case 'high':
-      return 'border-l-destructive';
-    case 'medium':
-      return 'border-l-warning';
-    case 'low':
-      return 'border-l-success';
-  }
+const getPriorityColor = (isUrgent: boolean) => {
+  return isUrgent ? 'border-l-destructive' : 'border-l-primary';
 };
 
 export const DashboardView = () => {
+  const { tasks, loading, toggleComplete } = useTasks();
+  const { user } = useAuth();
   const currentTime = new Date();
-  const currentHour = currentTime.getHours();
-  const currentMinutes = currentTime.getMinutes();
+  
+  // Transform tasks into dashboard events
+  const todayEvents: DashboardEvent[] = tasks
+    .filter(task => {
+      const taskDate = new Date(task.start_time);
+      const today = new Date();
+      return taskDate.toDateString() === today.toDateString();
+    })
+    .map(task => {
+      const startTime = new Date(task.start_time);
+      const endTime = new Date(task.end_time);
+      const duration = Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60));
+      
+      let status: 'upcoming' | 'current' | 'completed' = 'upcoming';
+      if (task.is_completed) {
+        status = 'completed';
+      } else if (currentTime >= startTime && currentTime <= endTime) {
+        status = 'current';
+      }
+      
+      return {
+        id: task.id,
+        title: task.title,
+        time: startTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }),
+        duration: duration >= 60 ? `${Math.floor(duration / 60)}h ${duration % 60}m` : `${duration}m`,
+        category: task.category,
+        status,
+        is_completed: task.is_completed,
+        location: task.description?.includes('at ') ? task.description.split('at ').pop() : undefined
+      };
+    })
+    .sort((a, b) => a.time.localeCompare(b.time));
+
+  const completedTasks = tasks.filter(task => task.is_completed).length;
+  const totalTasks = tasks.length;
+  const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Good morning, Alex!</h1>
+          <h1 className="text-3xl font-bold text-foreground">
+            Good morning, {user?.user_metadata?.full_name || 'there'}!
+          </h1>
           <p className="text-muted-foreground">
-            You have 5 events today. Let's make it productive!
+            You have {todayEvents.length} events today. Let's make it productive!
           </p>
         </div>
         <Button className="bg-gradient-primary text-primary-foreground hover:opacity-90">
@@ -139,7 +124,7 @@ export const DashboardView = () => {
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Today's Events</p>
-              <p className="text-2xl font-bold">8</p>
+              <p className="text-2xl font-bold">{todayEvents.length}</p>
             </div>
           </div>
         </Card>
@@ -163,7 +148,7 @@ export const DashboardView = () => {
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Productivity</p>
-              <p className="text-2xl font-bold">87%</p>
+              <p className="text-2xl font-bold">{completionRate}%</p>
             </div>
           </div>
         </Card>
@@ -188,43 +173,62 @@ export const DashboardView = () => {
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-semibold">Today's Timeline</h2>
               <Badge variant="outline" className="bg-gradient-accent text-accent-foreground border-0">
-                5 events
+                {todayEvents.length} events
               </Badge>
             </div>
             
             <div className="space-y-4">
-              {todayEvents.map((event, index) => (
-                <div
-                  key={event.id}
-                  className={`flex items-center gap-4 p-4 rounded-lg border-l-4 transition-all duration-200 hover:shadow-md ${getPriorityColor(event.priority)} ${
-                    event.status === 'current' ? 'bg-gradient-accent/10 border-accent' : 'bg-background/50'
-                  }`}
-                >
-                  {getEventStatusIcon(event.status)}
-                  
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className={`font-semibold ${event.status === 'completed' ? 'line-through text-muted-foreground' : ''}`}>
-                        {event.title}
-                      </h3>
-                      <Badge className={`text-xs ${getCategoryColor(event.category)}`}>
-                        {event.category}
-                      </Badge>
+              {loading ? (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">Loading your tasks...</p>
+                </div>
+              ) : todayEvents.length > 0 ? (
+                todayEvents.map((event) => (
+                  <div
+                    key={event.id}
+                    className={`flex items-center gap-4 p-4 rounded-lg border-l-4 transition-all duration-200 hover:shadow-md ${getPriorityColor(false)} ${
+                      event.status === 'current' ? 'bg-gradient-accent/10 border-accent' : 'bg-background/50'
+                    }`}
+                  >
+                    {getEventStatusIcon(event.status)}
+                    
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className={`font-semibold ${event.is_completed ? 'line-through text-muted-foreground' : ''}`}>
+                          {event.title}
+                        </h3>
+                        <Badge className={`text-xs ${getCategoryColor(event.category)}`}>
+                          {event.category}
+                        </Badge>
+                      </div>
+                      
+                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                        <span>{event.time} • {event.duration}</span>
+                        {event.location && (
+                          <span>📍 {event.location}</span>
+                        )}
+                      </div>
                     </div>
                     
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <span>{event.time} • {event.duration}</span>
-                      {event.location && (
-                        <span>📍 {event.location}</span>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => toggleComplete(event.id)}
+                    >
+                      {event.is_completed ? (
+                        <CheckCircle2 className="h-4 w-4 text-success" />
+                      ) : (
+                        <MoreHorizontal className="h-4 w-4" />
                       )}
-                    </div>
+                    </Button>
                   </div>
-                  
-                  <Button variant="ghost" size="sm">
-                    <MoreHorizontal className="h-4 w-4" />
-                  </Button>
+                ))
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">No tasks scheduled for today.</p>
+                  <p className="text-sm text-muted-foreground mt-1">Add some tasks to get started!</p>
                 </div>
-              ))}
+              )}
             </div>
           </Card>
         </div>
@@ -288,9 +292,9 @@ export const DashboardView = () => {
               <div>
                 <div className="flex justify-between text-sm mb-2">
                   <span>Tasks Completed</span>
-                  <span className="font-semibold">12/15</span>
+                  <span className="font-semibold">{completedTasks}/{totalTasks}</span>
                 </div>
-                <Progress value={80} className="h-2" />
+                <Progress value={completionRate} className="h-2" />
               </div>
               
               <div>

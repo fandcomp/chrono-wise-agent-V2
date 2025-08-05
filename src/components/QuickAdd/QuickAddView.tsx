@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
+import { useTasks } from "@/hooks/useTasks";
 import { 
   PlusCircle, 
   Calendar, 
@@ -43,7 +44,21 @@ export const QuickAddView = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [parsedEvent, setParsedEvent] = useState<ParsedEvent | null>(null);
   const [manualMode, setManualMode] = useState(false);
+  
+  // Manual form state
+  const [formData, setFormData] = useState({
+    title: '',
+    category: 'Personal',
+    date: '',
+    priority: 'medium',
+    startTime: '',
+    endTime: '',
+    location: '',
+    description: ''
+  });
+  
   const { toast } = useToast();
+  const { createTask } = useTasks();
 
   const handleNaturalLanguageParse = async () => {
     if (!naturalInput.trim()) return;
@@ -73,15 +88,61 @@ export const QuickAddView = () => {
     }, 2000);
   };
 
-  const handleSaveEvent = () => {
-    toast({
-      title: "Event added to calendar!",
-      description: "Your event has been scheduled and synced",
+  const handleSaveEvent = async () => {
+    if (!parsedEvent) return;
+    
+    const startDateTime = new Date(`${parsedEvent.date}T${parsedEvent.startTime}`).toISOString();
+    const endDateTime = parsedEvent.endTime 
+      ? new Date(`${parsedEvent.date}T${parsedEvent.endTime}`).toISOString()
+      : new Date(new Date(`${parsedEvent.date}T${parsedEvent.startTime}`).getTime() + 60 * 60 * 1000).toISOString();
+    
+    await createTask({
+      title: parsedEvent.title,
+      description: `Parsed from: "${naturalInput}"${parsedEvent.location ? ` at ${parsedEvent.location}` : ''}`,
+      start_time: startDateTime,
+      end_time: endDateTime,
+      category: parsedEvent.category
     });
     
     // Reset form
     setNaturalInput('');
     setParsedEvent(null);
+  };
+
+  const handleManualSave = async () => {
+    if (!formData.title || !formData.date || !formData.startTime) {
+      toast({
+        title: "Missing required fields",
+        description: "Please fill in title, date, and start time.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const startDateTime = new Date(`${formData.date}T${formData.startTime}`).toISOString();
+    const endDateTime = formData.endTime 
+      ? new Date(`${formData.date}T${formData.endTime}`).toISOString()
+      : new Date(new Date(`${formData.date}T${formData.startTime}`).getTime() + 60 * 60 * 1000).toISOString();
+    
+    await createTask({
+      title: formData.title,
+      description: formData.description,
+      start_time: startDateTime,
+      end_time: endDateTime,
+      category: formData.category
+    });
+    
+    // Reset form
+    setFormData({
+      title: '',
+      category: 'Personal',
+      date: '',
+      priority: 'medium',
+      startTime: '',
+      endTime: '',
+      location: '',
+      description: ''
+    });
   };
 
   return (
@@ -249,32 +310,40 @@ export const QuickAddView = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium mb-2">Event Title</label>
-                <Input placeholder="Enter event title" />
+                <Input 
+                  placeholder="Enter event title" 
+                  value={formData.title}
+                  onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                />
               </div>
               
               <div>
                 <label className="block text-sm font-medium mb-2">Category</label>
-                <Select>
+                <Select value={formData.category} onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="work">Work</SelectItem>
-                    <SelectItem value="study">Study</SelectItem>
-                    <SelectItem value="personal">Personal</SelectItem>
-                    <SelectItem value="break">Break</SelectItem>
+                    <SelectItem value="Work">Work</SelectItem>
+                    <SelectItem value="Study">Study</SelectItem>
+                    <SelectItem value="Personal">Personal</SelectItem>
+                    <SelectItem value="Break">Break</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               <div>
                 <label className="block text-sm font-medium mb-2">Date</label>
-                <Input type="date" />
+                <Input 
+                  type="date" 
+                  value={formData.date}
+                  onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
+                />
               </div>
 
               <div>
                 <label className="block text-sm font-medium mb-2">Priority</label>
-                <Select>
+                <Select value={formData.priority} onValueChange={(value) => setFormData(prev => ({ ...prev, priority: value }))}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select priority" />
                   </SelectTrigger>
@@ -288,28 +357,55 @@ export const QuickAddView = () => {
 
               <div>
                 <label className="block text-sm font-medium mb-2">Start Time</label>
-                <Input type="time" />
+                <Input 
+                  type="time" 
+                  value={formData.startTime}
+                  onChange={(e) => setFormData(prev => ({ ...prev, startTime: e.target.value }))}
+                />
               </div>
 
               <div>
                 <label className="block text-sm font-medium mb-2">End Time</label>
-                <Input type="time" />
+                <Input 
+                  type="time" 
+                  value={formData.endTime}
+                  onChange={(e) => setFormData(prev => ({ ...prev, endTime: e.target.value }))}
+                />
               </div>
             </div>
 
             <div>
               <label className="block text-sm font-medium mb-2">Location (Optional)</label>
-              <Input placeholder="Enter location" />
+              <Input 
+                placeholder="Enter location" 
+                value={formData.location}
+                onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))}
+              />
             </div>
 
             <div>
               <label className="block text-sm font-medium mb-2">Description (Optional)</label>
-              <Textarea placeholder="Add any additional details" />
+              <Textarea 
+                placeholder="Add any additional details" 
+                value={formData.description}
+                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+              />
             </div>
 
             <div className="flex justify-end gap-2">
-              <Button variant="outline">Cancel</Button>
-              <Button className="bg-gradient-primary text-primary-foreground">
+              <Button variant="outline" onClick={() => setFormData({
+                title: '',
+                category: 'Personal',
+                date: '',
+                priority: 'medium',
+                startTime: '',
+                endTime: '',
+                location: '',
+                description: ''
+              })}>
+                Cancel
+              </Button>
+              <Button onClick={handleManualSave} className="bg-gradient-primary text-primary-foreground">
                 Add Event
               </Button>
             </div>
