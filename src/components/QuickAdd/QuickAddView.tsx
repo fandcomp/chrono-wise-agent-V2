@@ -33,11 +33,13 @@ interface ParsedEvent {
 }
 
 const nlpExamples = [
-  "Meeting dengan klien besok jam 2 siang di Starbucks",
-  "Deadline laporan Jumat depan pukul 23:59",
-  "Gym session hari Senin 17:00-18:00",
-  "Presentasi project minggu depan Rabu jam 10 pagi",
-  "Lunch dengan tim marketing tomorrow 12:30"
+  "nanti sore saya akan mencuci",
+  "besok pagi meeting dengan klien jam 9",
+  "minggu depan Rabu deadline laporan",
+  "hari Jumat gym session jam 5 sore", 
+  "malam ini belajar untuk ujian",
+  "lunch dengan tim besok jam 12:30",
+  "presentasi project Senin depan pagi"
 ];
 
 function extractJsonOnly(str: string): string {
@@ -81,18 +83,74 @@ export const QuickAddView = () => {
 
     setIsProcessing(true);
     try {
-      // Prompt Gemini
-      const prompt = `Extract meeting/event details from: "${naturalInput}". Reply with JSON including fields: title, date (YYYY-MM-DD), startTime (HH:mm), endTime (optional, HH:mm), location, category, priority (high/medium/low).`;
+      // Enhanced prompt untuk natural language Indonesia
+      const currentDate = new Date();
+      const currentDateStr = currentDate.toISOString().split('T')[0]; // YYYY-MM-DD
+      const currentTime = currentDate.toTimeString().slice(0, 5); // HH:mm
+      
+      const prompt = `
+Kamu adalah AI assistant yang ahli dalam memahami bahasa Indonesia dan mengubah input natural language menjadi data terstruktur untuk task/event.
+
+INPUT USER: "${naturalInput}"
+
+KONTEKS WAKTU:
+- Hari ini: ${currentDateStr}
+- Waktu sekarang: ${currentTime}
+
+TUGAS: Analisis input dan ekstrak informasi berikut dalam format JSON:
+
+PETUNJUK INTERPRETASI:
+- "nanti sore" = hari ini sekitar 16:00-18:00
+- "besok pagi" = hari berikutnya sekitar 08:00-10:00  
+- "minggu depan" = 7 hari dari sekarang
+- "jam 2 siang" = 14:00
+- Jika tidak ada waktu spesifik, berikan waktu yang masuk akal sesuai konteks
+- Jika tidak ada tanggal, asumsikan hari ini atau waktu terdekat yang masuk akal
+
+FORMAT OUTPUT (JSON only, no explanation):
+{
+  "title": "nama kegiatan yang jelas",
+  "date": "YYYY-MM-DD",
+  "startTime": "HH:mm", 
+  "endTime": "HH:mm",
+  "location": "lokasi jika disebutkan",
+  "category": "Personal/Work/Study/Health/Meeting",
+  "priority": "high/medium/low",
+  "confidence": 0.95
+}
+
+CONTOH:
+Input: "nanti sore saya akan mencuci"
+Output: {"title": "Mencuci", "date": "${currentDateStr}", "startTime": "16:00", "endTime": "17:00", "location": "", "category": "Personal", "priority": "medium", "confidence": 0.9}
+
+Sekarang proses input user dan berikan JSON:
+`;
 
       const aiResult = await geminiPrompt(prompt);
+      console.log('AI Response:', aiResult);
 
       let parsed;
-try {
-  const aiResultClean = extractJsonOnly(aiResult);
-  parsed = JSON.parse(aiResultClean);
-} catch {
-  throw new Error("AI response format error: " + aiResult);
-}
+      try {
+        const aiResultClean = extractJsonOnly(aiResult);
+        console.log('Cleaned JSON:', aiResultClean);
+        parsed = JSON.parse(aiResultClean);
+        
+        // Validasi dan normalisasi data
+        if (!parsed.title || !parsed.date || !parsed.startTime) {
+          throw new Error("Data tidak lengkap dari AI");
+        }
+        
+        // Set default endTime jika tidak ada
+        if (!parsed.endTime) {
+          const startDate = new Date(`${parsed.date}T${parsed.startTime}`);
+          const endDate = new Date(startDate.getTime() + 60 * 60 * 1000); // +1 jam
+          parsed.endTime = endDate.toTimeString().slice(0, 5);
+        }
+        
+      } catch (parseError) {
+        console.error('Parse error:', parseError);
+        throw new Error("AI response format error: " + aiResult);
+      }
 
       setParsedEvent(parsed);
       toast({
@@ -112,22 +170,47 @@ try {
   const handleSaveEvent = async () => {
     if (!parsedEvent) return;
     
-    const startDateTime = new Date(`${parsedEvent.date}T${parsedEvent.startTime}`).toISOString();
-    const endDateTime = parsedEvent.endTime 
-      ? new Date(`${parsedEvent.date}T${parsedEvent.endTime}`).toISOString()
-      : new Date(new Date(`${parsedEvent.date}T${parsedEvent.startTime}`).getTime() + 60 * 60 * 1000).toISOString();
-    
-    await createTask({
-      title: parsedEvent.title,
-      description: `Parsed from: "${naturalInput}"${parsedEvent.location ? ` at ${parsedEvent.location}` : ''}`,
-      start_time: startDateTime,
-      end_time: endDateTime,
-      category: parsedEvent.category
-    });
-    
-    // Reset form
-    setNaturalInput('');
-    setParsedEvent(null);
+    try {
+      const startDateTime = new Date(`${parsedEvent.date}T${parsedEvent.startTime}`).toISOString();
+      const endDateTime = parsedEvent.endTime 
+        ? new Date(`${parsedEvent.date}T${parsedEvent.endTime}`).toISOString()
+        : new Date(new Date(`${parsedEvent.date}T${parsedEvent.startTime}`).getTime() + 60 * 60 * 1000).toISOString();
+      
+      console.log('Saving task:', {
+        title: parsedEvent.title,
+        start_time: startDateTime,
+        end_time: endDateTime,
+        category: parsedEvent.category
+      });
+      
+      const newTask = await createTask({
+        title: parsedEvent.title,
+        description: `AI Generated: "${naturalInput}"${parsedEvent.location ? ` | Lokasi: ${parsedEvent.location}` : ''}`,
+        start_time: startDateTime,
+        end_time: endDateTime,
+        category: parsedEvent.category
+      });
+      
+      if (newTask) {
+        toast({
+          title: "Task berhasil ditambahkan!",
+          description: `"${parsedEvent.title}" telah ditambahkan ke jadwal Anda`,
+        });
+        
+        // Reset form
+        setNaturalInput('');
+        setParsedEvent(null);
+      } else {
+        throw new Error("Gagal menyimpan task");
+      }
+    } catch (error) {
+      console.error('Error saving task:', error);
+      toast({
+        title: "Error",
+        description: "Gagal menyimpan task. Silakan coba lagi.",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleManualSave = async () => {
@@ -203,12 +286,15 @@ try {
           /* Natural Language Input */
           <div className="space-y-6">
             <div>
-              <label className="block text-sm font-medium mb-2">
-                Describe your event naturally
-              </label>
+              <div className="flex items-center gap-2 mb-3">
+                <Brain className="h-5 w-5 text-primary" />
+                <label className="block text-sm font-medium">
+                  Tulis kegiatan Anda dalam bahasa natural
+                </label>
+              </div>
               <div className="relative">
                 <Textarea
-                  placeholder="Try: 'Meeting dengan klien besok jam 2 siang di Starbucks' or 'Deadline project Jumat depan pukul 23:59'"
+                  placeholder="Contoh: 'nanti sore saya akan mencuci' atau 'besok pagi meeting dengan klien jam 9' atau 'minggu depan Rabu deadline laporan'"
                   value={naturalInput}
                   onChange={(e) => setNaturalInput(e.target.value)}
                   className="min-h-[100px] pr-12"
@@ -226,6 +312,14 @@ try {
                     <Zap className="h-4 w-4" />
                   )}
                 </Button>
+              </div>
+              
+              {/* Help Text */}
+              <div className="mt-2 p-3 bg-muted/50 rounded-lg">
+                <p className="text-xs text-muted-foreground">
+                  💡 <strong>Tips:</strong> AI akan otomatis menentukan waktu yang sesuai berdasarkan konteks. 
+                  Misalnya "nanti sore" = sekitar 16:00, "besok pagi" = sekitar 08:00.
+                </p>
               </div>
             </div>
 
@@ -265,7 +359,7 @@ try {
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
                     <CheckCircle2 className="h-5 w-5 text-success" />
-                    <h4 className="font-semibold">Extracted Event Details</h4>
+                    <h4 className="font-semibold">AI Berhasil Memproses Input Anda</h4>
                     <Badge 
                       className={`text-xs ${
                         parsedEvent.confidence >= 0.8 
@@ -273,53 +367,93 @@ try {
                           : 'bg-warning text-warning-foreground'
                       }`}
                     >
-                      {Math.round(parsedEvent.confidence * 100)}% Confidence
+                      {Math.round(parsedEvent.confidence * 100)}% Akurat
                     </Badge>
                   </div>
-                  <Button variant="outline" size="sm">
-                    Edit Details
+                  <Button variant="outline" size="sm" onClick={() => setParsedEvent(null)}>
+                    Edit Manual
                   </Button>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 text-sm mb-4">
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-medium">Date:</span>
-                    <span>{new Date(parsedEvent.date).toLocaleDateString('id-ID')}</span>
-                  </div>
+                {/* Original Input */}
+                <div className="mb-4 p-3 bg-muted/30 rounded-lg">
+                  <p className="text-sm text-muted-foreground mb-1">Input Anda:</p>
+                  <p className="text-sm font-medium italic">"{naturalInput}"</p>
+                </div>
+
+                {/* Parsed Details */}
+                <div className="mb-4">
+                  <h5 className="font-medium mb-3 text-center text-lg">📅 {parsedEvent.title}</h5>
                   
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-medium">Time:</span>
-                    <span>{parsedEvent.startTime} {parsedEvent.endTime && `- ${parsedEvent.endTime}`}</span>
-                  </div>
-
-                  {parsedEvent.location && (
+                  <div className="grid grid-cols-2 gap-4 text-sm">
                     <div className="flex items-center gap-2">
-                      <MapPin className="h-4 w-4 text-muted-foreground" />
-                      <span className="font-medium">Location:</span>
-                      <span>{parsedEvent.location}</span>
+                      <Calendar className="h-4 w-4 text-primary" />
+                      <span className="font-medium">Tanggal:</span>
+                      <span className="text-foreground">
+                        {new Date(parsedEvent.date).toLocaleDateString('id-ID', { 
+                          weekday: 'long', 
+                          year: 'numeric', 
+                          month: 'long', 
+                          day: 'numeric' 
+                        })}
+                      </span>
                     </div>
-                  )}
+                    
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-4 w-4 text-primary" />
+                      <span className="font-medium">Waktu:</span>
+                      <span className="text-foreground font-mono">
+                        {parsedEvent.startTime}{parsedEvent.endTime && ` - ${parsedEvent.endTime}`}
+                      </span>
+                    </div>
 
-                  <div className="flex items-center gap-2">
-                    <Tag className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-medium">Category:</span>
-                    <Badge variant="outline" className="text-xs">
-                      {parsedEvent.category}
-                    </Badge>
+                    {parsedEvent.location && (
+                      <div className="flex items-center gap-2 col-span-2">
+                        <MapPin className="h-4 w-4 text-primary" />
+                        <span className="font-medium">Lokasi:</span>
+                        <span className="text-foreground">{parsedEvent.location}</span>
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-2">
+                      <Tag className="h-4 w-4 text-primary" />
+                      <span className="font-medium">Kategori:</span>
+                      <Badge variant="secondary" className="text-xs">
+                        {parsedEvent.category}
+                      </Badge>
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4 text-primary" />
+                      <span className="font-medium">Prioritas:</span>
+                      <Badge 
+                        variant="outline" 
+                        className={`text-xs ${
+                          parsedEvent.priority === 'high' ? 'border-destructive text-destructive' :
+                          parsedEvent.priority === 'medium' ? 'border-warning text-warning' :
+                          'border-muted-foreground text-muted-foreground'
+                        }`}
+                      >
+                        {parsedEvent.priority === 'high' ? 'Tinggi' : 
+                         parsedEvent.priority === 'medium' ? 'Sedang' : 'Rendah'}
+                      </Badge>
+                    </div>
                   </div>
                 </div>
 
-                <div className="flex justify-end gap-2">
-                  <Button variant="outline" onClick={() => setParsedEvent(null)}>
-                    Cancel
+                <div className="flex justify-between gap-3 pt-4 border-t border-border">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setParsedEvent(null)}
+                    className="flex-1"
+                  >
+                    ✏️ Edit Manual
                   </Button>
                   <Button 
                     onClick={handleSaveEvent}
-                    className="bg-gradient-primary text-primary-foreground"
+                    className="bg-gradient-primary text-primary-foreground flex-1 font-semibold"
                   >
-                    Add to Calendar
+                    ✅ Tambah ke Timeline
                   </Button>
                 </div>
               </Card>
