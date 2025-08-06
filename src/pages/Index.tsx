@@ -12,7 +12,7 @@ const Index = () => {
   const renderActiveView = () => {
     switch (activeView) {
       case 'dashboard':
-        return <DashboardView />;
+        return <DashboardView onViewChange={setActiveView} />;
       case 'analytics':
         return <AnalyticsView />;
       case 'upload':
@@ -20,7 +20,7 @@ const Index = () => {
       case 'add-task':
         return <QuickAddView />;
       default:
-        return <DashboardView />;
+        return <DashboardView onViewChange={setActiveView} />;
     }
   };
 

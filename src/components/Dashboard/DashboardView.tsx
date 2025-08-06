@@ -3,6 +3,8 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { RealtimeClock, CompactClock } from "@/components/ui/realtime-clock";
 import { useTasks } from "@/hooks/useTasks";
 import { useAuth } from "@/contexts/AuthContext";
 import { geminiPrompt } from "@/ai/gemini/client";
@@ -15,7 +17,8 @@ import {
   AlertCircle,
   Plus,
   MoreHorizontal,
-  Brain
+  Brain,
+  ArrowRight
 } from "lucide-react";
 
 interface DashboardEvent {
@@ -59,7 +62,11 @@ const getPriorityColor = (isUrgent: boolean) => {
   return isUrgent ? 'border-l-destructive' : 'border-l-primary';
 };
 
-export const DashboardView = () => {
+interface DashboardViewProps {
+  onViewChange?: (view: string) => void;
+}
+
+export const DashboardView = ({ onViewChange }: DashboardViewProps) => {
   const { tasks, loading, toggleComplete } = useTasks();
   const { user } = useAuth();
   const currentTime = new Date();
@@ -100,6 +107,13 @@ export const DashboardView = () => {
   const totalTasks = tasks.length;
   const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
+  // Quick Add navigation handler
+  const handleQuickAdd = () => {
+    if (onViewChange) {
+      onViewChange('add-task');
+    }
+  };
+
   // === Gemini AI Suggestions integration ===
   const [aiSuggestions, setAiSuggestions] = useState<string>("");
   const [aiLoading, setAiLoading] = useState(false);
@@ -136,10 +150,27 @@ Jawab dalam format bullet point singkat dan dalam bahasa Indonesia.`;
             You have {todayEvents.length} events today. Let's make it productive!
           </p>
         </div>
-        <Button className="bg-gradient-primary text-primary-foreground hover:opacity-90">
-          <Plus className="h-4 w-4 mr-2" />
-          Quick Add
-        </Button>
+        <div className="flex items-center gap-4">
+          <div className="hidden sm:block">
+            <CompactClock />
+          </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button 
+                className="bg-gradient-primary text-primary-foreground hover:opacity-90 transition-all duration-200 hover:scale-105 hover:shadow-lg group"
+                onClick={handleQuickAdd}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                <span className="hidden sm:inline">Quick Add</span>
+                <span className="sm:hidden">Add</span>
+                <ArrowRight className="h-3 w-3 ml-1 transition-transform group-hover:translate-x-1" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Tambah task baru dengan cepat</p>
+            </TooltipContent>
+          </Tooltip>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -262,6 +293,9 @@ Jawab dalam format bullet point singkat dan dalam bahasa Indonesia.`;
 
         {/* Side Panel */}
         <div className="space-y-6">
+          {/* Real-time Clock Widget */}
+          <RealtimeClock />
+
           {/* Upcoming Priority Tasks */}
           <Card className="p-6 bg-gradient-card border-0 shadow-card">
             <h3 className="text-lg font-semibold mb-4">Priority Tasks</h3>

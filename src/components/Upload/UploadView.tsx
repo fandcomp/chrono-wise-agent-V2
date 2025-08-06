@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
 import { useTasks } from "@/hooks/useTasks";
-import * as pdfjsLib from 'pdfjs-dist';
+import type { ExtractedEvent } from "@/data/demoSchedule";
 import { 
   Upload, 
   FileText, 
@@ -25,27 +25,12 @@ import {
   CalendarPlus
 } from "lucide-react";
 
-// Set up PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
-
 function cleanGeminiJson(str: string): string {
   let res = str.trim();
   if (res.startsWith("```json")) res = res.replace(/^```json/, "").trim();
   if (res.startsWith("```")) res = res.replace(/^```/, "").trim();
   if (res.endsWith("```")) res = res.replace(/```$/, "").trim();
   return res;
-}
-
-interface ExtractedEvent {
-  id: string;
-  title: string;
-  date: string;
-  startTime: string;
-  endTime: string;
-  location?: string;
-  instructor?: string;
-  category: string;
-  confidence: number;
 }
 
 export const UploadView = () => {
@@ -61,9 +46,15 @@ export const UploadView = () => {
   const { toast } = useToast();
   const { createTask } = useTasks();
 
-  // Fungsi untuk ekstraksi teks dari PDF menggunakan PDF.js
+  // Fungsi untuk ekstraksi teks dari PDF menggunakan PDF.js (lazy loaded)
   const extractTextFromPDF = async (file: File): Promise<string> => {
     try {
+      // Dynamically import PDF.js to reduce initial bundle size
+      const pdfjsLib = await import('pdfjs-dist');
+      
+      // Set up PDF.js worker dynamically
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+      
       const arrayBuffer = await file.arrayBuffer();
       const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
       let extractedText = '';
@@ -301,36 +292,15 @@ export const UploadView = () => {
       console.log('Extracted text preview:', extractedText.substring(0, 200));
     } catch (pdfError) {
       console.warn('PDF extraction failed, using demo data:', pdfError);
-      // Demo text untuk testing
-      extractedText = `
-        Academic Schedule - Semester Genap 2024/2025
-        
-        KELAS III RPLK (Rekayasa Perangkat Lunak dan Gim):
-        Senin 08:00 - 10:00 Pemrograman Web Lanjutan Mr. Budi Ruang Lab 301
-        Selasa 10:30 - 12:30 Database Management System Ms. Sari Ruang Lab 302
-        Rabu 14:00 - 16:00 Mobile App Development Mr. Andi Ruang Lab 303
-        Kamis 09:00 - 11:00 Software Engineering Dr. Rini Ruang 304
-        Jumat 13:00 - 15:00 Game Development Mr. Doni Ruang Lab 305
-        
-        KELAS III TKJ (Teknik Komputer dan Jaringan):
-        Senin 10:00 - 12:00 Network Security Mr. Agus Ruang Lab 201
-        Selasa 08:00 - 10:00 Server Administration Ms. Dewi Ruang Lab 202
-        Rabu 13:00 - 15:00 Wireless Technology Dr. Hadi Ruang Lab 203
-        
-        KELAS III MM (Multimedia):
-        Senin 13:00 - 15:00 Video Editing Ms. Eka Ruang Studio A
-        Selasa 14:00 - 16:00 3D Animation Mr. Fajar Ruang Studio B
-      `;
+      // Use separated demo data for better code splitting
+      const { DEMO_SCHEDULE_TEXT } = await import('@/data/demoSchedule');
+      extractedText = DEMO_SCHEDULE_TEXT;
     }
 
     // Jika tidak ada teks yang diekstrak, gunakan demo data
     if (!extractedText.trim()) {
-      extractedText = `
-        Academic Schedule - Semester Genap 2024/2025
-        KELAS III RPLK: Senin 08:00-10:00 Pemrograman Web Lanjutan Mr. Budi Lab 301
-        KELAS III TKJ: Senin 10:00-12:00 Network Security Mr. Agus Lab 201
-        KELAS III MM: Senin 13:00-15:00 Video Editing Ms. Eka Studio A
-      `;
+      const { DEMO_SCHEDULE_TEXT } = await import('@/data/demoSchedule');
+      extractedText = DEMO_SCHEDULE_TEXT;
     }
 
     // Enhanced prompt dengan instruksi user
@@ -385,63 +355,8 @@ SCHEDULE TEXT: """${extractedText}"""
       console.error('AI Result that failed to parse:', aiResult);
       
       // Fallback: create filtered demo events based on instruction
-      let demoEvents: ExtractedEvent[] = [
-        {
-          id: "1",
-          title: "Pemrograman Web Lanjutan",
-          date: "2025-08-06",
-          startTime: "08:00",
-          endTime: "10:00",
-          location: "Lab 301",
-          instructor: "Mr. Budi",
-          category: "RPLK - Practical",
-          confidence: 0.9
-        },
-        {
-          id: "2", 
-          title: "Database Management System",
-          date: "2025-08-07",
-          startTime: "10:30",
-          endTime: "12:30",
-          location: "Lab 302",
-          instructor: "Ms. Sari",
-          category: "RPLK - Theory",
-          confidence: 0.85
-        },
-        {
-          id: "3",
-          title: "Mobile App Development", 
-          date: "2025-08-08",
-          startTime: "14:00",
-          endTime: "16:00",
-          location: "Lab 303",
-          instructor: "Mr. Andi",
-          category: "RPLK - Practical",
-          confidence: 0.88
-        },
-        {
-          id: "4",
-          title: "Network Security",
-          date: "2025-08-06",
-          startTime: "10:00",
-          endTime: "12:00",
-          location: "Lab 201",
-          instructor: "Mr. Agus",
-          category: "TKJ - Theory",
-          confidence: 0.9
-        },
-        {
-          id: "5",
-          title: "Video Editing",
-          date: "2025-08-06",
-          startTime: "13:00",
-          endTime: "15:00",
-          location: "Studio A",
-          instructor: "Ms. Eka",
-          category: "MM - Practical",
-          confidence: 0.87
-        }
-      ];
+      const { DEMO_EVENTS } = await import('@/data/demoSchedule');
+      let demoEvents: ExtractedEvent[] = [...DEMO_EVENTS];
       
       // Filter demo events based on user instruction
       if (instruction) {
