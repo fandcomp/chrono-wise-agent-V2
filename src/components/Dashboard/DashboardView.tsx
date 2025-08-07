@@ -7,6 +7,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { RealtimeClock, CompactClock } from "@/components/ui/realtime-clock";
 import { useTasks } from "@/hooks/useTasks";
 import { useAuth } from "@/contexts/AuthContext";
+// import { useGoogleCalendar } from "@/hooks/useGoogleCalendar";
 import { geminiPrompt } from "@/ai/gemini/client";
 import { 
   Calendar, 
@@ -18,7 +19,9 @@ import {
   Plus,
   MoreHorizontal,
   Brain,
-  ArrowRight
+  ArrowRight,
+  CalendarPlus,
+  CalendarCheck
 } from "lucide-react";
 
 interface DashboardEvent {
@@ -69,6 +72,23 @@ interface DashboardViewProps {
 export const DashboardView = ({ onViewChange }: DashboardViewProps) => {
   const { tasks, loading, toggleComplete } = useTasks();
   const { user } = useAuth();
+  /*
+  const { 
+    isSignedIn, 
+    signIn, 
+    createEventFromTask, 
+    isLoading: calendarLoading,
+    error: calendarError,
+    clearError 
+  } = useGoogleCalendar();
+  */
+  // Mock calendar values for build
+  const isSignedIn = false;
+  const signIn = async () => false;
+  const calendarLoading = false;
+  const calendarError = null;
+  const clearError = () => {};
+  
   const currentTime = new Date();
 
   // Transform tasks into dashboard events
@@ -114,6 +134,39 @@ export const DashboardView = ({ onViewChange }: DashboardViewProps) => {
     }
   };
 
+  // Google Calendar sync handler
+  const handleSyncToCalendar = async (event: DashboardEvent) => {
+    /*
+    try {
+      clearError();
+      
+      if (!isSignedIn) {
+        const signedIn = await signIn();
+        if (!signedIn) {
+          alert('Please sign in to Google Calendar to sync events');
+          return;
+        }
+      }
+
+      // Convert dashboard event back to task format for calendar
+      const task = {
+        title: event.title,
+        description: `Synced from ChronoWise Dashboard`,
+        start_time: new Date(`${new Date().toDateString()} ${event.time}`).toISOString(),
+        end_time: new Date(new Date(`${new Date().toDateString()} ${event.time}`).getTime() + 60 * 60 * 1000).toISOString(), // 1 hour default
+        location: event.location
+      };
+
+      await createEventFromTask(task);
+      alert(`✅ "${event.title}" has been added to your Google Calendar!`);
+    } catch (error) {
+      console.error('Failed to sync to Google Calendar:', error);
+      alert('❌ Failed to sync to Google Calendar. Please try again.');
+    }
+    */
+    alert('🔧 Google Calendar integration is in development. Coming soon!');
+  };
+
   // === Gemini AI Suggestions integration ===
   const [aiSuggestions, setAiSuggestions] = useState<string>("");
   const [aiLoading, setAiLoading] = useState(false);
@@ -151,6 +204,35 @@ Jawab dalam format bullet point singkat dan dalam bahasa Indonesia.`;
           </p>
         </div>
         <div className="flex items-center gap-4">
+          {/* Google Calendar Status */}
+          <div className="flex items-center gap-2">
+            {isSignedIn ? (
+              <div className="flex items-center gap-1 text-success text-sm">
+                <CalendarCheck className="h-4 w-4" />
+                <span className="hidden sm:inline">Calendar Connected</span>
+              </div>
+            ) : (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={signIn}
+                    disabled={calendarLoading}
+                    className="text-xs"
+                  >
+                    <CalendarPlus className="h-3 w-3 mr-1" />
+                    <span className="hidden sm:inline">Connect Calendar</span>
+                    <span className="sm:hidden">Calendar</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Connect Google Calendar to sync events</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
+          </div>
+
           <div className="hidden sm:block">
             <CompactClock />
           </div>
@@ -268,17 +350,40 @@ Jawab dalam format bullet point singkat dan dalam bahasa Indonesia.`;
                       </div>
                     </div>
                     
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={() => toggleComplete(event.id)}
-                    >
-                      {event.is_completed ? (
-                        <CheckCircle2 className="h-4 w-4 text-success" />
-                      ) : (
-                        <MoreHorizontal className="h-4 w-4" />
+                    <div className="flex items-center gap-2">
+                      {/* Google Calendar Sync Button */}
+                      {isSignedIn && !event.is_completed && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={() => handleSyncToCalendar(event)}
+                              disabled={calendarLoading}
+                              className="h-8 w-8 p-0"
+                            >
+                              <CalendarPlus className="h-4 w-4 text-blue-500" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Add to Google Calendar</p>
+                          </TooltipContent>
+                        </Tooltip>
                       )}
-                    </Button>
+
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => toggleComplete(event.id)}
+                        className="h-8 w-8 p-0"
+                      >
+                        {event.is_completed ? (
+                          <CheckCircle2 className="h-4 w-4 text-success" />
+                        ) : (
+                          <MoreHorizontal className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
                   </div>
                 ))
               ) : (
@@ -384,6 +489,25 @@ Jawab dalam format bullet point singkat dan dalam bahasa Indonesia.`;
           </Card>
         </div>
       </div>
+
+      {/* Google Calendar Error Display */}
+      {calendarError && (
+        <Card className="p-4 bg-destructive/10 border-destructive/20">
+          <div className="flex items-center gap-2 text-destructive">
+            <AlertCircle className="h-4 w-4" />
+            <span className="text-sm font-medium">Google Calendar Error:</span>
+            <span className="text-sm">{calendarError}</span>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={clearError}
+              className="ml-auto h-6 w-6 p-0"
+            >
+              ×
+            </Button>
+          </div>
+        </Card>
+      )}
     </div>
   );
 };

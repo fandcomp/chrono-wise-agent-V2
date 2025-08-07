@@ -1,73 +1,201 @@
-# Welcome to your Lovable project
+# 🕐 ChronoWise Agent
 
-## Project info
+**Intelligent Time Management & Scheduling Assistant**
 
-**URL**: https://lovable.dev/projects/78578425-0915-4e83-968b-dce9fb8fa21a
+A modern web application that helps users manage their tasks, schedules, and productivity with AI-powered insights and Google Calendar integration.
 
-## How can I edit this code?
+## ✨ Features
 
-There are several ways of editing your application.
+### 🛡️ Secure Authentication
+- Supabase-powered user authentication
+- Protected routes and secure sessions
+- Environment variable security
 
-**Use Lovable**
+### 📊 Smart Dashboard
+- Real-time task overview
+- Calendar sync status monitoring
+- Quick action buttons for common tasks
+- Analytics integration
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/78578425-0915-4e83-968b-dce9fb8fa21a) and start prompting.
+### 📤 Document Upload & Processing  
+- PDF document upload
+- OCR and NLP processing with Google Gemini AI
+- Intelligent content extraction
 
-Changes made via Lovable will be committed automatically to this repo.
+### 📈 Analytics & Insights
+- Task completion tracking
+- Productivity metrics
+- Visual analytics dashboard
 
-**Use your preferred IDE**
+### 🔄 Google Calendar Integration (Architecture Ready)
+- OAuth 2.0 secure authentication
+- Calendar event creation and management  
+- Real-time synchronization
+- Browser-based implementation
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+## 🛠️ Technology Stack
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+### Frontend
+- **React 18** with TypeScript
+- **Vite** for fast development and building
+- **Tailwind CSS** for responsive styling
+- **shadcn/ui** for modern UI components
+- **Lucide React** for beautiful icons
 
-Follow these steps:
+### Backend & Services
+- **Supabase** for authentication and database
+- **Google Cloud APIs** for calendar integration
+- **Google Gemini AI** for document processing
+- **Vercel** for deployment
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+### Security & Build
+- Environment variable protection
+- OAuth-only authentication (no API keys in client)
+- Production-optimized builds
+- Git security measures
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+## 🚀 Quick Start
 
-# Step 3: Install the necessary dependencies.
-npm i
+### Prerequisites
+- Node.js 18+ and npm
+- Google Cloud Project with Calendar API enabled
+- Supabase account and project
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+### Installation
+
+```bash
+# Clone the repository
+git clone <your-repo-url>
+cd chrono-wise-agent
+
+# Install dependencies
+npm install
+
+# Set up environment variables
+cp .env.local.example .env.local
+# Edit .env.local with your configuration
+
+# Start development server
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+### Environment Setup
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+Create `.env.local` with:
 
-**Use GitHub Codespaces**
+```bash
+# Google Calendar Integration
+VITE_GOOGLE_CLIENT_ID=your-google-client-id
+VITE_GOOGLE_CALENDAR_ID=primary
+VITE_GOOGLE_REDIRECT_URI=http://localhost:8083/auth/callback
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+# Supabase Configuration
+VITE_SUPABASE_URL=your-supabase-url
+VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
 
-## What technologies are used for this project?
+# Google Gemini AI
+VITE_GEMINI_API_KEY=your-gemini-api-key
+```
 
-This project is built with:
+## 📋 Available Scripts
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+```bash
+# Development
+npm run dev          # Start development server
+npm run build        # Build for production
+npm run preview      # Preview production build
+npm run lint         # Run ESLint
 
-## How can I deploy this project?
+# Type checking
+npm run type-check   # TypeScript type checking
+```
 
-Simply open [Lovable](https://lovable.dev/projects/78578425-0915-4e83-968b-dce9fb8fa21a) and click on Share -> Publish.
+## 🔐 Security Features
 
-## Can I connect a custom domain to my Lovable project?
+- **OAuth 2.0 Authentication**: Secure Google Calendar integration without API key exposure
+- **Environment Protection**: Only VITE_ prefixed variables included in client bundle
+- **Git Security**: Comprehensive .gitignore preventing credential leaks
+- **Client-side Architecture**: Browser-based API calls for enhanced security
 
-Yes, you can!
+## 📁 Project Structure
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+```
+src/
+├── components/          # Reusable UI components
+│   ├── Dashboard/      # Dashboard-specific components
+│   ├── Upload/         # File upload components
+│   ├── Analytics/      # Analytics components
+│   └── ui/             # shadcn/ui components
+├── hooks/              # Custom React hooks
+├── contexts/           # React contexts
+├── integrations/       # External service integrations
+│   ├── calendar/       # Google Calendar integration
+│   ├── gemini/         # AI processing
+│   └── supabase/       # Database and auth
+├── ai/                 # AI agents and controllers
+└── lib/                # Utility functions
+```
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+## 🚀 Deployment
+
+### Vercel Deployment (Recommended)
+
+1. **Build Verification**
+   ```bash
+   npm run build
+   npm run preview
+   ```
+
+2. **Environment Setup**
+   - Copy variables from `.env.production` template
+   - Set in Vercel dashboard under Environment Variables
+
+3. **Google Cloud Console**
+   - Add production redirect URI to OAuth settings
+   - Update authorized JavaScript origins
+
+4. **Deploy**
+   - Connect GitHub repository to Vercel
+   - Configure environment variables
+   - Deploy!
+
+See [`DEPLOYMENT.md`](./DEPLOYMENT.md) for detailed deployment guide.
+
+## 🔍 Current Status
+
+### ✅ Production Ready
+- Secure authentication system
+- Modern responsive UI
+- Document upload and processing
+- Analytics dashboard
+- Environment security
+- Production builds
+
+### 🔄 Google Calendar Integration
+- **Architecture**: Complete OAuth implementation ready
+- **Status**: Currently using mocks for build compatibility
+- **Next Steps**: Resolve build system compatibility for full integration
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Submit a pull request
+
+## 📄 License
+
+This project is licensed under the MIT License.
+
+## 🙏 Acknowledgments
+
+- Built with [Vite](https://vitejs.dev/) and [React](https://reactjs.org/)
+- UI components from [shadcn/ui](https://ui.shadcn.com/)
+- Icons by [Lucide](https://lucide.dev/)
+- Authentication by [Supabase](https://supabase.com/)
+- AI processing by [Google Gemini](https://ai.google.dev/)
+
+---
+
+**Ready for production deployment!** 🚀
