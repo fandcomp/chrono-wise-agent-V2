@@ -25,3 +25,17 @@ dist-ssr
 
 # Environment variables
 .env
+.env.local
+.env.*.local
+
+# Google API Credentials
+google-credentials.json
+*-credentials.json
+service-account-key.json
+client_secret*.json
+
+# Other sensitive files
+*.pem
+*.key
+*.p12
+auth.json
