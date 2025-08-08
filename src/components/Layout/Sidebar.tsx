@@ -7,7 +7,10 @@ import {
   Clock,
   Target,
   Brain,
-  Zap
+  Zap,
+  TestTube,
+  Wifi,
+  Zap as Lightning
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -24,12 +27,18 @@ export const Sidebar = ({ activeView, onViewChange }: SidebarProps) => {
     { id: 'analytics', label: 'Analytics', icon: BarChart3, badge: null },
     { id: 'upload', label: 'Upload Schedule', icon: FileUp, badge: 'New' },
     { id: 'add-task', label: 'Quick Add', icon: PlusCircle, badge: null },
+  { id: 'calendar-sync', label: 'Calendar Sync', icon: Wifi, badge: null },
   ];
 
   const aiFeatures = [
     { id: 'ai-optimize', label: 'AI Optimize', icon: Brain, badge: 'Beta' },
     { id: 'smart-suggestions', label: 'Smart Suggestions', icon: Zap, badge: '5' },
     { id: 'focus-time', label: 'Focus Time', icon: Target, badge: null },
+  ];
+
+  const devTools = [
+    { id: 'gemini-test', label: 'Gemini API Test', icon: Brain, badge: 'AI' },
+    { id: 'testing', label: 'Testing Tools', icon: TestTube, badge: 'DEV' },
   ];
 
   return (
@@ -102,6 +111,43 @@ export const Sidebar = ({ activeView, onViewChange }: SidebarProps) => {
           );
         })}
       </div>
+
+      {/* Development Tools (only in development) */}
+      {import.meta.env.DEV && (
+        <div className="p-4 space-y-2">
+          <h2 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
+            <TestTube className="h-4 w-4" />
+            Dev Tools
+          </h2>
+          
+          {devTools.map((item) => {
+            const Icon = item.icon;
+            return (
+              <Button
+                key={item.id}
+                variant={activeView === item.id ? "default" : "ghost"}
+                className={`w-full justify-start gap-3 ${
+                  activeView === item.id 
+                    ? "bg-gradient-accent text-accent-foreground" 
+                    : "hover:bg-accent/10"
+                }`}
+                onClick={() => onViewChange(item.id)}
+              >
+                <Icon className="h-4 w-4" />
+                <span className="flex-1 text-left">{item.label}</span>
+                {item.badge && (
+                  <Badge 
+                    variant="outline"
+                    className="ml-auto text-xs"
+                  >
+                    {item.badge}
+                  </Badge>
+                )}
+              </Button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Quick Stats Card */}
       <div className="p-4 mt-auto">

@@ -51,8 +51,7 @@ export default defineConfig(({ mode }) => ({
           'icons': ['lucide-react'],
           // AI and integrations
           'integrations': [
-            '@supabase/supabase-js',
-            'googleapis'
+            '@supabase/supabase-js'
           ],
           // Utility libraries
           'utils': [

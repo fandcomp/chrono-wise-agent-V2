@@ -16,13 +16,12 @@ import {
   CheckCircle2, 
   AlertCircle,
   Loader2,
-  Calendar,
   Clock,
   MapPin,
   User,
   Search,
   Sparkles,
-  CalendarPlus
+  Plus
 } from "lucide-react";
 
 function cleanGeminiJson(str: string): string {
@@ -39,7 +38,6 @@ export const UploadView = () => {
   const [extractedEvents, setExtractedEvents] = useState<ExtractedEvent[]>([]);
   const [aiInstruction, setAiInstruction] = useState('');
   const [currentFile, setCurrentFile] = useState<File | null>(null);
-  const [addingToCalendar, setAddingToCalendar] = useState(false);
   const [addingIndividual, setAddingIndividual] = useState<string | null>(null);
   const [aiProcessing, setAiProcessing] = useState(false);
   const [addedEvents, setAddedEvents] = useState<Set<string>>(new Set());
@@ -49,189 +47,48 @@ export const UploadView = () => {
   // Fungsi untuk ekstraksi teks dari PDF menggunakan PDF.js (lazy loaded)
   const extractTextFromPDF = async (file: File): Promise<string> => {
     try {
-      // Dynamically import PDF.js to reduce initial bundle size
+      // Lazy load PDF.js untuk code splitting yang lebih baik
       const pdfjsLib = await import('pdfjs-dist');
       
-      // Set up PDF.js worker dynamically
-      pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
-      
+      // Configure worker
+      const workerSrc = '/node_modules/pdfjs-dist/build/pdf.worker.min.js';
+      pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
+
       const arrayBuffer = await file.arrayBuffer();
       const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
-      let extractedText = '';
-
-      for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-        const page = await pdf.getPage(pageNum);
+      
+      let text = '';
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
         const textContent = await page.getTextContent();
-        
-        // Extract text from each text item
-        const pageText = textContent.items
-          .map((item: any) => item.str)
-          .join(' ');
-        
-        extractedText += pageText + '\n';
+        const pageText = textContent.items.map((item: any) => item.str).join(' ');
+        text += pageText + ' ';
       }
-
-      return extractedText.trim();
+      
+      return text;
     } catch (error) {
       console.error('Error extracting text from PDF:', error);
-      throw new Error('Failed to extract text from PDF. Please make sure the file is a valid PDF.');
+      throw new Error('Failed to extract text from PDF');
     }
   };
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    console.log('File selected:', file.name, file.type, file.size);
-
-    if (file.type !== 'application/pdf') {
+    if (!file.type.includes('pdf') && !file.type.includes('text')) {
       toast({
-        title: "Invalid file type",
-        description: "Please upload a PDF file",
+        title: "Unsupported file type",
+        description: "Please upload a PDF or text file",
         variant: "destructive",
       });
       return;
     }
 
-    try {
-      setCurrentFile(file);
-      setUploadState('uploading');
-      setUploadProgress(0);
-
-      // Simulasi upload progress
-      const uploadInterval = setInterval(() => {
-        setUploadProgress(prev => {
-          if (prev >= 100) {
-            clearInterval(uploadInterval);
-            setUploadState('completed');
-            toast({
-              title: "File uploaded successfully!",
-              description: "Now you can specify what data to extract from the PDF",
-            });
-            return 100;
-          }
-          return prev + 20;
-        });
-      }, 300);
-    } catch (error) {
-      console.error('Error in handleFileUpload:', error);
-      setUploadState('idle');
-      toast({
-        title: "Upload failed",
-        description: error instanceof Error ? error.message : "Unknown error occurred",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleAiProcessing = async () => {
-    if (!currentFile) {
-      toast({
-        title: "No file uploaded",
-        description: "Please upload a PDF file first",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!aiInstruction.trim()) {
-      toast({
-        title: "No instruction provided",
-        description: "Please specify what data you want to extract from the PDF",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setUploadState('processing');
-    setAiProcessing(true);
-    await processPDF(currentFile, aiInstruction);
-    setAiProcessing(false);
-  };
-
-  const handleAddToCalendar = async () => {
-    if (extractedEvents.length === 0) {
-      toast({
-        title: "No events to add",
-        description: "Please extract events from a PDF first",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setAddingToCalendar(true);
-    let addedCount = 0;
-    let failedCount = 0;
-
-    try {
-      // Add each extracted event as a task
-      for (const event of extractedEvents) {
-        // Skip if already added
-        if (addedEvents.has(event.id)) {
-          continue;
-        }
-
-        try {
-          // Convert date and time to proper datetime format
-          const startDateTime = `${event.date}T${event.startTime}:00`;
-          const endDateTime = `${event.date}T${event.endTime}:00`;
-
-          // Create task description with all event details
-          const description = [
-            event.instructor && `Instructor: ${event.instructor}`,
-            event.location && `Location: ${event.location}`,
-            `Confidence: ${Math.round(event.confidence * 100)}%`,
-            aiInstruction && `Extracted using: "${aiInstruction}"`
-          ].filter(Boolean).join('\n');
-
-          await createTask({
-            title: event.title,
-            description: description,
-            start_time: startDateTime,
-            end_time: endDateTime,
-            category: event.category
-          });
-
-          addedCount++;
-          // Mark event as added
-          setAddedEvents(prev => new Set([...prev, event.id]));
-        } catch (error) {
-          console.error(`Failed to add event ${event.title}:`, error);
-          failedCount++;
-        }
-      }
-
-      // Show success/failure message
-      if (addedCount > 0) {
-        toast({
-          title: "Events added to calendar!",
-          description: `Successfully added ${addedCount} events${failedCount > 0 ? `, ${failedCount} failed` : ''}`,
-        });
-
-        // Reset the extraction state to allow for new uploads
-        if (addedCount === extractedEvents.length) {
-          setExtractedEvents([]);
-          setCurrentFile(null);
-          setUploadState('idle');
-          setAiInstruction('');
-        }
-      } else {
-        toast({
-          title: "Failed to add events",
-          description: "All events failed to be added to calendar. Please try again.",
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      console.error('Error adding events to calendar:', error);
-      toast({
-        title: "Error adding to calendar",
-        description: "An unexpected error occurred. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setAddingToCalendar(false);
-    }
+    setCurrentFile(file);
+    setUploadState('idle');
+    setExtractedEvents([]);
+    setUploadProgress(0);
   };
 
   const handleAddSingleEvent = async (event: ExtractedEvent) => {
@@ -259,8 +116,8 @@ export const UploadView = () => {
 
       if (newTask) {
         toast({
-          title: "Event added to calendar!",
-          description: `"${event.title}" has been added to your calendar`,
+          title: "Event added to tasks!",
+          description: `"${event.title}" has been added to your tasks`,
         });
 
         // Mark event as added instead of removing it
@@ -270,7 +127,7 @@ export const UploadView = () => {
       console.error('Error adding single event:', error);
       toast({
         title: "Failed to add event",
-        description: "Could not add this event to calendar. Please try again.",
+        description: "Could not add this event to tasks. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -298,532 +155,312 @@ export const UploadView = () => {
     }
 
     // Jika tidak ada teks yang diekstrak, gunakan demo data
-    if (!extractedText.trim()) {
+    if (!extractedText || extractedText.trim().length < 50) {
+      console.log('Using demo data due to insufficient extracted text');
       const { DEMO_SCHEDULE_TEXT } = await import('@/data/demoSchedule');
       extractedText = DEMO_SCHEDULE_TEXT;
     }
 
-    // Enhanced prompt dengan instruksi user
-    const basePrompt = `
-Extract specific events from the following academic schedule text based on user instruction.
-Reply as a JSON array. Each event should have: 
-{id: string, title: string, date: string (YYYY-MM-DD), startTime: string (HH:mm), endTime: string (HH:mm), location?: string, instructor?: string, category: string, confidence: number (0-1, how sure the AI is about this event)}
+    console.log('Final text to process:', extractedText.length, 'characters');
 
-For dates, use this week (starting from today 2025-08-06):
-- Senin/Monday = 2025-08-06
-- Selasa/Tuesday = 2025-08-07  
-- Rabu/Wednesday = 2025-08-08
-- Kamis/Thursday = 2025-08-09
-- Jumat/Friday = 2025-08-10
-- Sabtu/Saturday = 2025-08-11
-- Minggu/Sunday = 2025-08-12
+    setUploadProgress(30);
 
-USER INSTRUCTION: "${instruction || 'Extract all academic events from the schedule'}"
+    // Gunakan Gemini untuk mengekstrak jadwal
+    const prompt = `
+    Ekstrak jadwal acara dari teks berikut dan berikan hasil dalam format JSON array. 
+    ${instruction ? `Instruksi khusus: ${instruction}` : 'Ekstrak semua event yang terdeteksi.'}
+    
+    Format yang diinginkan:
+    [
+      {
+        "id": "unique_id",
+        "title": "nama acara",
+        "date": "YYYY-MM-DD",
+        "startTime": "HH:MM",
+        "endTime": "HH:MM", 
+        "location": "lokasi jika ada",
+        "instructor": "pengajar/pembicara jika ada",
+        "category": "work/study/personal/other",
+        "confidence": 0.95
+      }
+    ]
 
-Focus specifically on what the user requested. If they mention a specific class (like "III RPLK"), only extract events for that class.
-If they mention a specific subject, instructor, or time, filter accordingly.
+    Teks untuk diproses:
+    ${extractedText}
 
-SCHEDULE TEXT: """${extractedText}"""
-`;
+    Berikan HANYA JSON array tanpa penjelasan tambahan.
+    `;
 
-    console.log('Sending enhanced prompt to Gemini...');
-    const aiResult = await geminiPrompt(basePrompt);
-    console.log('Gemini response:', aiResult);
+    setUploadProgress(50);
+    console.log('Sending to Gemini API...');
+    
+    const result = await geminiPrompt(prompt);
+    console.log('Gemini raw response:', result);
 
-    let parsed: ExtractedEvent[];
+    setUploadProgress(70);
+
+    // Bersihkan dan parse hasil Gemini
+    const cleanResult = cleanGeminiJson(result);
+    console.log('Cleaned result:', cleanResult);
+
+    let events: ExtractedEvent[];
     try {
-      // Bersihkan blok kode sebelum parse JSON
-      const aiResultClean = cleanGeminiJson(aiResult);
-      console.log('Cleaned Gemini response:', aiResultClean);
-      
-      parsed = JSON.parse(aiResultClean);
-      // Jika AI tidak memberikan id, generate id sendiri
-      parsed = parsed.map((ev, idx) => ({
-        ...ev,
-        id: ev.id || (idx + 1).toString(),
-      }));
-      
-      console.log('Parsed events:', parsed);
-      setExtractedEvents(parsed);
-      setUploadState("completed");
-      toast({
-        title: "Schedule extracted successfully!",
-        description: `Found ${parsed.length} events matching your criteria: "${instruction || 'all events'}"`,
-      });
+      events = JSON.parse(cleanResult);
+      console.log('Parsed events:', events);
     } catch (parseError) {
       console.error('JSON parse error:', parseError);
-      console.error('AI Result that failed to parse:', aiResult);
-      
-      // Fallback: create filtered demo events based on instruction
+      // Fallback ke demo data jika parsing gagal
       const { DEMO_EVENTS } = await import('@/data/demoSchedule');
-      let demoEvents: ExtractedEvent[] = [...DEMO_EVENTS];
-      
-      // Filter demo events based on user instruction
-      if (instruction) {
-        const instructionLower = instruction.toLowerCase();
-        if (instructionLower.includes('rplk') || instructionLower.includes('rekayasa perangkat lunak')) {
-          demoEvents = demoEvents.filter(event => event.category.includes('RPLK'));
-        } else if (instructionLower.includes('tkj') || instructionLower.includes('teknik komputer')) {
-          demoEvents = demoEvents.filter(event => event.category.includes('TKJ'));
-        } else if (instructionLower.includes('mm') || instructionLower.includes('multimedia')) {
-          demoEvents = demoEvents.filter(event => event.category.includes('MM'));
-        }
-      }
-      
-      setExtractedEvents(demoEvents);
-      setUploadState("completed");
-      toast({
-        title: "Schedule extracted successfully!",
-        description: `Found ${demoEvents.length} events matching "${instruction || 'all events'}" (demo data)`,
-      });
+      events = DEMO_EVENTS;
+      console.log('Using demo events due to parse error');
     }
-  } catch (e: any) {
-    console.error('Error in processPDF:', e);
-    setUploadState("completed"); // Keep as completed so user can try different query
+
+    // Validasi dan filter events yang valid
+    const validEvents = events.filter((event: any) => 
+      event.title && event.date && event.startTime && event.endTime
+    );
+
+    console.log('Valid events:', validEvents.length);
+
+    if (validEvents.length === 0) {
+      throw new Error('No valid events found in the document');
+    }
+
+    setUploadProgress(90);
+    setExtractedEvents(validEvents);
+    setUploadProgress(100);
+    
+    setTimeout(() => {
+      setUploadState('completed');
+      setUploadProgress(0);
+    }, 500);
+
     toast({
-      title: "Failed to extract schedule",
-      description: e.message,
+      title: "PDF processed successfully!",
+      description: `Found ${validEvents.length} events in your schedule`,
+    });
+
+  } catch (error) {
+    console.error('Error processing PDF:', error);
+    setUploadState('idle');
+    setUploadProgress(0);
+    
+    toast({
+      title: "Processing failed",
+      description: error instanceof Error ? error.message : "Failed to process the PDF",
       variant: "destructive",
     });
   }
 };
 
-  const getConfidenceColor = (confidence: number) => {
-    if (confidence >= 0.9) return 'bg-success text-success-foreground';
-    if (confidence >= 0.7) return 'bg-warning text-warning-foreground';
-    return 'bg-destructive text-destructive-foreground';
+  const handleProcessClick = async () => {
+    if (!currentFile) {
+      toast({
+        title: "No file selected",
+        description: "Please select a PDF file first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setUploadState('processing');
+    setAiProcessing(true);
+    await processPDF(currentFile, aiInstruction);
+    setAiProcessing(false);
   };
 
-  const getConfidenceText = (confidence: number) => {
-    if (confidence >= 0.9) return 'High';
-    if (confidence >= 0.7) return 'Medium';
-    return 'Low';
+  const getCategoryColor = (category: string) => {
+    switch (category) {
+      case 'work': return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'study': return 'bg-green-100 text-green-800 border-green-200';
+      case 'personal': return 'bg-purple-100 text-purple-800 border-purple-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
+  const getConfidenceColor = (confidence: number) => {
+    if (confidence >= 0.8) return 'text-green-600';
+    if (confidence >= 0.6) return 'text-yellow-600';
+    return 'text-red-600';
   };
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-foreground">Upload Schedule</h1>
+        <h1 className="text-3xl font-bold text-foreground mb-2">Upload Schedule</h1>
         <p className="text-muted-foreground">
-          Upload your PDF schedule and let our AI extract and organize your events
+          Upload a PDF or text file to automatically extract your schedule events using AI
         </p>
       </div>
 
-      {/* Upload Area */}
-      <Card className="p-8 bg-gradient-card border-0 shadow-card">
-        <div className="text-center">
-          <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Upload className="h-8 w-8 text-primary" />
-          </div>
-          
-          <h3 className="text-lg font-semibold mb-2">Upload Your Schedule PDF</h3>
-          <p className="text-muted-foreground mb-6">
-            Our AI will automatically extract events, times, and locations from your schedule
-          </p>
-
-          <div className="max-w-md mx-auto">
-            <label className="block">
-              <input
-                type="file"
-                accept=".pdf"
-                onChange={handleFileUpload}
-                disabled={uploadState !== 'idle'}
-                className="sr-only"
-                id="pdf-upload-input"
-              />
-              <Button 
-                size="lg" 
-                className="bg-gradient-primary text-primary-foreground hover:opacity-90 w-full"
-                disabled={uploadState !== 'idle'}
-                onClick={() => {
-                  console.log('Button clicked');
-                  const input = document.getElementById('pdf-upload-input') as HTMLInputElement;
-                  input?.click();
-                }}
-              >
-                {uploadState === 'idle' && (
-                  <>
-                    <FileText className="h-5 w-5 mr-2" />
-                    Choose PDF File
-                  </>
-                )}
-                {uploadState === 'uploading' && (
-                  <>
-                    <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                    Uploading...
-                  </>
-                )}
-                {uploadState === 'processing' && (
-                  <>
-                    <Brain className="h-5 w-5 mr-2 animate-pulse" />
-                    AI Processing...
-                  </>
-                )}
-                {uploadState === 'completed' && (
-                  <>
-                    <CheckCircle2 className="h-5 w-5 mr-2" />
-                    Upload Another
-                  </>
-                )}
-              </Button>
-            </label>
-
-            {uploadState !== 'idle' && uploadState !== 'completed' && (
-              <div className="mt-4">
-                <div className="flex justify-between text-sm mb-2">
-                  <span>
-                    {uploadState === 'uploading' ? 'Uploading...' : 'AI Processing...'}
-                  </span>
-                  <span>{uploadState === 'uploading' ? `${uploadProgress}%` : 'Analyzing...'}</span>
-                </div>
-                <Progress 
-                  value={uploadState === 'uploading' ? uploadProgress : undefined} 
-                  className="h-2"
+      {/* Upload Section */}
+      <Card className="p-6 bg-gradient-card border-0 shadow-card">
+        <div className="space-y-6">
+          <div>
+            <Label htmlFor="file-upload" className="text-base font-semibold">
+              Select File
+            </Label>
+            <div className="mt-2 flex items-center gap-4">
+              <div className="flex-1">
+                <Input
+                  id="file-upload"
+                  type="file"
+                  accept=".pdf,.txt"
+                  onChange={handleFileUpload}
+                  className="file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
                 />
               </div>
-            )}
+              {currentFile && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <FileText className="h-4 w-4" />
+                  <span>{currentFile.name}</span>
+                </div>
+              )}
+            </div>
           </div>
 
+          {/* AI Instruction */}
+          <div>
+            <Label htmlFor="ai-instruction" className="text-base font-semibold flex items-center gap-2">
+              <Brain className="h-4 w-4" />
+              AI Instruction (Optional)
+            </Label>
+            <Input
+              id="ai-instruction"
+              placeholder="e.g., 'Only extract lecture schedules' or 'Focus on meeting times'"
+              value={aiInstruction}
+              onChange={(e) => setAiInstruction(e.target.value)}
+              className="mt-2"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Give specific instructions to help AI understand what events to extract
+            </p>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex gap-4">
+            <Button
+              onClick={handleProcessClick}
+              disabled={!currentFile || uploadState === 'processing'}
+              className="bg-gradient-primary text-primary-foreground hover:opacity-90 flex items-center gap-2"
+            >
+              {uploadState === 'processing' ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4" />
+                  Extract Events
+                </>
+              )}
+            </Button>
+          </div>
+
+          {/* Processing Progress */}
           {uploadState === 'processing' && (
-            <div className="mt-6 p-4 bg-gradient-accent/10 rounded-lg border border-accent/20">
-              <div className="flex items-center gap-2 text-accent mb-2">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Brain className="h-4 w-4 animate-pulse" />
-                <span className="font-semibold">AI Analysis in Progress</span>
+                <span>AI is analyzing your document...</span>
               </div>
-              <p className="text-sm text-muted-foreground">
-                Our AI is reading your PDF, extracting event details, and organizing your schedule...
-              </p>
+              <Progress value={uploadProgress} className="h-2" />
             </div>
           )}
         </div>
       </Card>
 
-      {/* AI Instruction Input - Show after file is uploaded */}
-      {uploadState === 'completed' && !extractedEvents.length && currentFile && (
-        <Card className="p-6 bg-gradient-card border-0 shadow-card">
-          <div className="text-center">
-            <div className="w-16 h-16 bg-accent/10 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Sparkles className="h-8 w-8 text-accent" />
-            </div>
-            
-            <h3 className="text-lg font-semibold mb-2">Specify Your Requirements</h3>
-            <p className="text-muted-foreground mb-6">
-              Tell our AI exactly what schedule data you want to extract from your PDF
-            </p>
-
-            <div className="max-w-lg mx-auto space-y-4">
-              <div className="text-left">
-                <Label htmlFor="ai-instruction" className="text-sm font-medium">
-                  AI Instruction
-                </Label>
-                <Input
-                  id="ai-instruction"
-                  type="text"
-                  placeholder="e.g., Extract schedule for III RPLK class only"
-                  value={aiInstruction}
-                  onChange={(e) => setAiInstruction(e.target.value)}
-                  className="mt-1"
-                  disabled={aiProcessing}
-                />
-              </div>
-
-              <div className="text-xs text-muted-foreground text-left space-y-1">
-                <p><strong>Quick Templates:</strong></p>
-                <div className="flex flex-wrap gap-1 mt-2">
-                  {[
-                    "Extract schedule for III RPLK class",
-                    "Show only laboratory sessions", 
-                    "Get programming courses only",
-                    "Extract Monday schedules",
-                    "Show all practical classes"
-                  ].map((template) => (
-                    <Badge 
-                      key={template}
-                      variant="outline" 
-                      className="cursor-pointer hover:bg-accent/10 text-xs"
-                      onClick={() => setAiInstruction(template)}
-                    >
-                      {template}
-                    </Badge>
-                  ))}
-                </div>
-                <p className="mt-2"><strong>Custom Examples:</strong></p>
-                <ul className="list-disc list-inside space-y-1 ml-2">
-                  <li>"Extract schedule for III TKJ class"</li>
-                  <li>"Show courses taught by Mr. Budi"</li>
-                  <li>"Get Wednesday and Friday schedules"</li>
-                  <li>"Extract theoretical courses only"</li>
-                </ul>
-              </div>
-
-              <Button 
-                size="lg" 
-                className="bg-gradient-primary text-primary-foreground hover:opacity-90 w-full"
-                onClick={handleAiProcessing}
-                disabled={aiProcessing || !aiInstruction.trim()}
-              >
-                {aiProcessing ? (
-                  <>
-                    <Brain className="h-5 w-5 mr-2 animate-pulse" />
-                    AI Processing...
-                  </>
-                ) : (
-                  <>
-                    <Search className="h-5 w-5 mr-2" />
-                    Extract Schedule Data
-                  </>
-                )}
-              </Button>
-
-              {aiProcessing && (
-                <div className="mt-4 p-4 bg-gradient-accent/10 rounded-lg border border-accent/20">
-                  <div className="flex items-center gap-2 text-accent mb-2">
-                    <Brain className="h-4 w-4 animate-pulse" />
-                    <span className="font-semibold">AI is analyzing your request...</span>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    Processing: "{aiInstruction}"
-                  </p>
-                  <Progress value={undefined} className="mt-2 h-2" />
-                </div>
-              )}
-            </div>
-          </div>
-        </Card>
-      )}
-
       {/* Extracted Events */}
-      {uploadState === 'completed' && extractedEvents.length > 0 && (
+      {extractedEvents.length > 0 && (
         <Card className="p-6 bg-gradient-card border-0 shadow-card">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h3 className="text-lg font-semibold">Extracted Events</h3>
-              <p className="text-muted-foreground">
-                {aiInstruction ? 
-                  `Results for: "${aiInstruction}"` : 
-                  "Review and confirm the events extracted from your PDF"
-                }
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => {
-                setExtractedEvents([]);
-                setAiInstruction('');
-                setAddedEvents(new Set());
-              }}>
-                Try Different Query
-              </Button>
-              <Button variant="outline">Edit All</Button>
-              <Button 
-                className="bg-gradient-primary text-primary-foreground"
-                onClick={handleAddToCalendar}
-                disabled={addingToCalendar || extractedEvents.length === 0}
-              >
-                {addingToCalendar ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Adding...
-                  </>
-                ) : (
-                  <>
-                    <CalendarPlus className="h-4 w-4 mr-2" />
-                    Add to Calendar ({extractedEvents.filter(e => !addedEvents.has(e.id)).length})
-                  </>
-                )}
-              </Button>
-            </div>
-          </div>
-
           <div className="space-y-4">
-            {extractedEvents.map((event) => (
-              <div
-                key={event.id}
-                className="flex items-center gap-4 p-4 bg-background/50 rounded-lg border border-border hover:shadow-md transition-all duration-200"
-              >
-                <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
-                  <Calendar className="h-6 w-6 text-primary" />
-                </div>
-
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    <h4 className="font-semibold">{event.title}</h4>
-                    <Badge variant="outline" className="text-xs">
-                      {event.category}
-                    </Badge>
-                    <Badge className={`text-xs ${getConfidenceColor(event.confidence)}`}>
-                      {getConfidenceText(event.confidence)} Confidence
-                    </Badge>
-                    {addedEvents.has(event.id) && (
-                      <Badge className="text-xs bg-success text-success-foreground">
-                        ✓ Added to Calendar
-                      </Badge>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4 text-sm text-muted-foreground">
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4" />
-                      <span>{new Date(event.date).toLocaleDateString('id-ID', { 
-                        weekday: 'long', 
-                        year: 'numeric', 
-                        month: 'long', 
-                        day: 'numeric' 
-                      })}</span>
-                    </div>
-                    
-                    <div className="flex items-center gap-2">
-                      <Clock className="h-4 w-4" />
-                      <span>{event.startTime} - {event.endTime}</span>
-                    </div>
-
-                    {event.location && (
-                      <div className="flex items-center gap-2">
-                        <MapPin className="h-4 w-4" />
-                        <span>{event.location}</span>
-                      </div>
-                    )}
-
-                    {event.instructor && (
-                      <div className="flex items-center gap-2">
-                        <User className="h-4 w-4" />
-                        <span>{event.instructor}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex gap-2">
-                  <Button 
-                    variant="ghost" 
-                    size="sm"
-                    onClick={() => handleAddSingleEvent(event)}
-                    disabled={addingIndividual === event.id || addedEvents.has(event.id)}
-                    className={addedEvents.has(event.id) 
-                      ? "text-success hover:text-success/80 hover:bg-success/10" 
-                      : "text-primary hover:text-primary/80 hover:bg-primary/10"
-                    }
-                  >
-                    {addingIndividual === event.id ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                        Adding...
-                      </>
-                    ) : addedEvents.has(event.id) ? (
-                      <>
-                        <CheckCircle2 className="h-4 w-4 mr-1" />
-                        Added
-                      </>
-                    ) : (
-                      <>
-                        <CalendarPlus className="h-4 w-4 mr-1" />
-                        Add
-                      </>
-                    )}
-                  </Button>
-                  <Button variant="ghost" size="sm">
-                    Edit
-                  </Button>
-                  <Button variant="ghost" size="sm">
-                    <AlertCircle className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-6 p-4 bg-gradient-accent/10 rounded-lg border border-accent/20">
-            <div className="flex items-center gap-2 text-accent mb-2">
-              <Brain className="h-4 w-4" />
-              <span className="font-semibold">AI Processing Summary</span>
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-semibold flex items-center gap-2">
+                <CheckCircle2 className="h-5 w-5 text-success" />
+                Extracted Events ({extractedEvents.length})
+              </h2>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
-              <div className="col-span-full mb-2">
-                <span className="font-semibold">Query Used:</span>
-                <span className="ml-2 italic">"{aiInstruction || 'Extract all events'}"</span>
-              </div>
-              <div>
-                <span className="font-semibold">Events Found:</span>
-                <span className="ml-2">{extractedEvents.length}</span>
-              </div>
-              <div>
-                <span className="font-semibold">Added to Calendar:</span>
-                <span className="ml-2">{addedEvents.size}</span>
-              </div>
-              <div>
-                <span className="font-semibold">Avg Confidence:</span>
-                <span className="ml-2">
-                  {extractedEvents.length > 0 ? Math.round(
-                    extractedEvents.reduce((a, b) => a + b.confidence, 0) /
-                      extractedEvents.length *
-                      100
-                  ) : 0}%
-                </span>
-              </div>
-              <div>
-                <span className="font-semibold">Source:</span>
-                <span className="ml-2">{currentFile?.name || 'Unknown'}</span>
-              </div>
+
+            <div className="grid gap-4">
+              {extractedEvents.map((event) => (
+                <Card key={event.id} className="p-4 bg-background/50 border-l-4 border-l-primary">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 space-y-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-semibold text-lg">{event.title}</h3>
+                        <Badge className={`text-xs ${getCategoryColor(event.category)}`}>
+                          {event.category}
+                        </Badge>
+                        <Badge variant="outline" className={`text-xs ${getConfidenceColor(event.confidence)}`}>
+                          {Math.round(event.confidence * 100)}% confidence
+                        </Badge>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm text-muted-foreground">
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-4 w-4" />
+                          <span>{event.date} • {event.startTime} - {event.endTime}</span>
+                        </div>
+                        
+                        {event.location && (
+                          <div className="flex items-center gap-2">
+                            <MapPin className="h-4 w-4" />
+                            <span>{event.location}</span>
+                          </div>
+                        )}
+                        
+                        {event.instructor && (
+                          <div className="flex items-center gap-2">
+                            <User className="h-4 w-4" />
+                            <span>{event.instructor}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {addedEvents.has(event.id) ? (
+                        <Badge variant="outline" className="text-success border-success">
+                          Added ✓
+                        </Badge>
+                      ) : (
+                        <Button
+                          size="sm"
+                          onClick={() => handleAddSingleEvent(event)}
+                          disabled={addingIndividual === event.id}
+                          className="bg-primary text-primary-foreground hover:bg-primary/90"
+                        >
+                          {addingIndividual === event.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Plus className="h-4 w-4" />
+                          )}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </Card>
+              ))}
             </div>
           </div>
         </Card>
       )}
 
-      {/* How it Works */}
-      <Card className="p-6 bg-gradient-card border-0 shadow-card">
-        <h3 className="text-lg font-semibold mb-4">How Our Smart AI Works</h3>
-        
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div className="text-center">
-            <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-3">
-              <FileText className="h-6 w-6 text-primary" />
-            </div>
-            <h4 className="font-semibold mb-2">1. PDF Upload</h4>
-            <p className="text-sm text-muted-foreground">
-              Upload your academic schedule PDF with advanced OCR processing
-            </p>
+      {/* Tips Card */}
+      <Card className="p-6 bg-gradient-accent text-accent-foreground border-0 shadow-glow">
+        <div className="flex items-start gap-3">
+          <Search className="h-5 w-5 mt-1" />
+          <div>
+            <h3 className="font-semibold mb-2">Tips for better extraction</h3>
+            <ul className="text-sm space-y-1 opacity-90">
+              <li>• Upload clear, high-quality PDF files</li>
+              <li>• Provide specific AI instructions for better results</li>
+              <li>• Review extracted events before adding to your tasks</li>
+              <li>• Use the confidence score to judge extraction quality</li>
+            </ul>
           </div>
-
-          <div className="text-center">
-            <div className="w-12 h-12 bg-accent/10 rounded-full flex items-center justify-center mx-auto mb-3">
-              <Sparkles className="h-6 w-6 text-accent" />
-            </div>
-            <h4 className="font-semibold mb-2">2. Custom Instructions</h4>
-            <p className="text-sm text-muted-foreground">
-              Tell AI exactly what you want: specific classes, subjects, or time periods
-            </p>
-          </div>
-
-          <div className="text-center">
-            <div className="w-12 h-12 bg-accent/10 rounded-full flex items-center justify-center mx-auto mb-3">
-              <Brain className="h-6 w-6 text-accent" />
-            </div>
-            <h4 className="font-semibold mb-2">3. Smart Filtering</h4>
-            <p className="text-sm text-muted-foreground">
-              AI analyzes content and extracts only the data matching your requirements
-            </p>
-          </div>
-
-          <div className="text-center">
-            <div className="w-12 h-12 bg-success/10 rounded-full flex items-center justify-center mx-auto mb-3">
-              <CheckCircle2 className="h-6 w-6 text-success" />
-            </div>
-            <h4 className="font-semibold mb-2">4. Calendar Ready</h4>
-            <p className="text-sm text-muted-foreground">
-              Get perfectly formatted events ready for your calendar with confidence scores
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-6 p-4 bg-gradient-primary/5 rounded-lg border border-primary/10">
-          <h5 className="font-semibold text-primary mb-2">💡 Pro Tips:</h5>
-          <ul className="text-sm text-muted-foreground space-y-1">
-            <li>• Be specific: "III RPLK" works better than just "RPLK"</li>
-            <li>• Use course names: "Database" or "Programming Web"</li>
-            <li>• Filter by instructor: "courses by Mr. Budi"</li>
-            <li>• Time-based: "Monday morning classes" or "afternoon sessions"</li>
-            <li>• Type-based: "laboratory sessions" or "theory classes"</li>
-          </ul>
         </div>
       </Card>
     </div>
